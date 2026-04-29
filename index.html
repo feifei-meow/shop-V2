@@ -1,0 +1,2286 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>明星商城</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {}
+      }
+    }
+  </script>
+  <style>
+    * { box-sizing: border-box; }
+    /* 隱藏不可用券標籤 */
+    span.absolute.top-2.left-2.text-white.rounded.font-medium[style*="#6b7280"] { display: none !important; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+      background: #f5f5f5;
+    }
+    #app-shell {
+      width: 100%;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    .slide { transition: opacity 0.7s ease; }
+    .dot-active { background: white !important; }
+    .dot-inactive { background: rgba(255,255,255,0.4) !important; }
+    .left-bar { transition: left 0.3s ease; }
+    @keyframes badge-bounce {
+      0%,100%{ transform:translateX(-50%) scale(1); }
+      50%{ transform:translateX(-50%) scale(1.08); }
+    }
+    .badge-anim { animation: badge-bounce 1.2s ease infinite; }
+    /* Cart flash when item added */
+    @keyframes cart-flash {
+      0%,100%{ transform:scale(1); box-shadow:0 4px 20px rgba(231,76,60,.4); }
+      50%    { transform:scale(1.15); box-shadow:0 8px 32px rgba(231,76,60,.8); }
+    }
+    .cart-flash { animation: cart-flash 0.5s ease 3; }
+    /* Modal overlay */
+    .modal-overlay {
+      position:absolute; inset:0;
+      background:rgba(0,0,0,.5);
+      z-index:200;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .modal-box {
+      background: linear-gradient(160deg,rgba(255,255,255,.98),rgba(235,240,255,.95)); border-radius:16px;
+      border: 1.5px solid rgba(255,255,255,.88);
+      border-bottom: 1.5px solid rgba(180,180,220,.4);
+      box-shadow:
+        0 8px 0 rgba(99,102,241,.2),
+        0 14px 0 rgba(99,102,241,.08),
+        0 22px 50px rgba(79,70,229,.28),
+        0 8px 20px rgba(0,0,0,.18),
+        inset 0 2px 0 rgba(255,255,255,.95);
+      max-width:440px; width:100%;
+      max-height:90vh; overflow-y:auto; scrollbar-width:none;
+    }
+    .modal-box::-webkit-scrollbar { display:none; }
+    /* Sliding panel */
+    .panel-overlay {
+      position:absolute; inset:0;
+      background:rgba(0,0,0,.3);
+      z-index:180;
+    }
+    .panel-box {
+      position:absolute; top:0; right:0; bottom:0;
+      width:380px; background: linear-gradient(160deg,rgba(255,255,255,.98),rgba(235,240,255,.95));
+      border-left: 1.5px solid rgba(255,255,255,.88);
+      box-shadow:
+        -6px 0 0 rgba(99,102,241,.18),
+        -12px 0 0 rgba(99,102,241,.07),
+        -20px 0 50px rgba(79,70,229,.25),
+        inset 2px 0 0 rgba(255,255,255,.9);
+      display:flex; flex-direction:column;
+      z-index:181;
+    }
+    /* Toast */
+    @keyframes toast-in { from{opacity:0;transform:translateX(-50%) translateY(6px);} to{opacity:1;transform:translateX(-50%) translateY(0);} }
+    .toast {
+      position:absolute; bottom:80px; left:50%; transform:translateX(-50%);
+      background:#323232; color:#fff; font-size:13px;
+      padding:7px 20px; border-radius:24px;
+      white-space:nowrap; z-index:300;
+      animation:toast-in .2s ease;
+      pointer-events:none;
+    }
+    /* 商品說明展開/收起 */
+    .desc-collapsed {
+      max-height: 88px;
+      overflow: hidden;
+      position: relative;
+      cursor: pointer;
+    }
+    .desc-collapsed:active { opacity: 0.85; }
+    .desc-collapsed::after {
+      content: '▼ 點此查看全部說明';
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: 44px;
+      background: linear-gradient(to bottom, rgba(249,250,251,0) 0%, rgba(249,250,251,1) 50%);
+      border-radius: 0 0 12px 12px;
+      pointer-events: none;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      padding-bottom: 6px;
+      font-size: 16px;
+      font-weight: 700;
+      color: #e87722;
+      letter-spacing: 0.5px;
+    }
+    .desc-expanded { max-height: none; overflow: visible; position: static; cursor: default; }
+    .desc-expanded::after { display: none; }
+    /* ── 長輩友善：放大文字、提升可讀性 ── */
+    body { line-height: 1.8; font-size: 18px; }
+    /* Header 商城名稱 */
+    #app-header .text-xl.font-bold { font-size: 22px !important; }
+    /* 分類 Tab */
+    #tabs button { font-size: 28px !important; min-height: 58px !important; padding: 14px 28px !important; }
+    /* Banner 副標 */
+    #banner h2 { font-size: 2.8rem !important; }
+    #banner p { font-size: 24px !important; }
+    #banner button { font-size: 24px !important; padding: 14px 26px !important; }
+    /* 區塊標題「限時搶購」等 */
+    #flash-sale .text-lg.font-bold { font-size: 30px !important; }
+    /* 限時搶購：商品名稱 */
+    #flash-sale .text-sm.font-medium { font-size: 28px !important; line-height: 1.6 !important; }
+    /* 限時搶購：別價按鈕文字 */
+    #flash-sale button.text-xs { font-size: 26px !important; padding: 14px 20px !important; width: 100% !important; line-height: 1.4 !important; }
+    #flash-sale button.text-xs svg { width: 26px !important; height: 26px !important; flex-shrink: 0; }
+    /* 限時搶購：倒計時 — 加紅加大 */
+    [id^="timer-"] { font-size: 28px !important; font-weight: 700 !important; color: #dc2626 !important; }
+    /* 商品格線：商品名稱 */
+    #tab-content-all .text-xs.font-medium,
+    #tab-content-diamond .text-xs.font-medium,
+    #tab-content-icoin .text-xs.font-medium,
+    #tab-content-items .text-xs.font-medium { font-size: 28px !important; line-height: 1.6 !important; }
+    /* 商品格線：購買按鈕文字與高度 */
+    #tab-content-all button.text-xs.font-bold,
+    #tab-content-diamond button.text-xs.font-bold,
+    #tab-content-icoin button.text-xs.font-bold,
+    #tab-content-items button.text-xs.font-bold {
+      font-size: 26px !important;
+      padding-top: 30px !important;
+      padding-bottom: 30px !important;
+    }
+    /* 超値加購區 - class 選擇器 */
+    #right-sidebar .font-bold.text-sm { font-size: 20px !important; }
+    #right-sidebar .text-xs { font-size: 18px !important; }
+    #right-sidebar .font-semibold { font-size: 20px !important; }
+    #right-sidebar .font-bold.text-red-500 { font-size: 22px !important; }
+    /* 超値加購區 - 覆寫 inline style 字級（屬性選擇器 + !important） */
+    #right-sidebar [style*="font-size:14px"] { font-size: 20px !important; }
+    #right-sidebar [style*="font-size:15px"] { font-size: 22px !important; }
+    #right-sidebar [style*="font-size:17px"] { font-size: 22px !important; }
+    #right-sidebar [style*="font-size:11px"] { font-size: 16px !important; }
+    /* 滿額贈禮左側欄 */
+    #leftBar .font-bold.text-gray-800 { font-size: 20px !important; color:#1e293b !important; }
+    #leftBar .text-2xl.font-extrabold { font-size: 28px !important; color:#dc2626 !important; }
+    #leftBar .text-xs { font-size: 16px !important; color:#374151 !important; }
+    #leftBar .text-sm.font-bold { font-size: 18px !important; color:#374151 !important; }
+    /* leftBar 強制所有文字顯示為深色 */
+    #leftBar * { color:inherit; }
+    #leftBar .font-bold { color:#1e293b !important; }
+    #leftBar > div > div:first-child .font-bold { color:#fff !important; }
+    #leftBar span[style*="color:#4b5563"] { color:#374151 !important; }
+    #leftBar span[style*="color:#6b7280"] { color:#374151 !important; }
+    /* 面板標題 */
+    #panelTitle { font-size: 30px !important; }
+    /* 面板內容文字 */
+    #panelContent .text-sm { font-size: 28px !important; line-height: 1.8 !important; }
+    #panelContent .text-xs { font-size: 28px !important; }
+    #panelContent .font-extrabold.text-red-500,
+    #panelContent .font-bold.text-red-500 { font-size: 30px !important; }
+    #panelContent .font-bold.text-gray-700 { font-size: 28px !important; }
+    #panelContent button.text-xs { font-size: 28px !important; padding: 14px 20px !important; }
+    /* 商品詳情 Modal */
+    #productModal h3.font-bold { font-size: 30px !important; }
+    #productModal .text-xl.font-extrabold { font-size: 32px !important; }
+    #productModal .text-sm { font-size: 28px !important; line-height: 1.8 !important; }
+    #productModal button { font-size: 28px !important; padding: 18px 8px !important; }
+    /* 入場券 Popup */
+    #couponPopup h3.text-xl { font-size: 30px !important; }
+    #couponPopup .text-sm.font-bold { font-size: 28px !important; }
+    #couponPopup .text-xs { font-size: 28px !important; }
+    #couponPopup button.text-base { font-size: 28px !important; padding: 18px !important; }
+    /* 離開對話框 */
+    #exitDialog h3.text-xl.font-bold { font-size: 30px !important; }
+    #exitDialog p.text-sm { font-size: 28px !important; line-height: 1.8 !important; }
+    #exitDialog button { font-size: 28px !important; }
+    /* Toast */
+    .toast { font-size: 28px !important; padding: 16px 36px !important; }
+    /* 購物車按鈕結帳文字 */
+    #floatCart .text-xs { font-size: 15px !important; }
+
+    /* ── 統整所有跳出窗 inline style 字級（屬性選擇器覆寫）── */
+    /* 入場券 Popup */
+    #couponPopup [style*="font-size:20px"] { font-size: 28px !important; }
+    #couponPopup [style*="font-size:17px"] { font-size: 28px !important; }
+    #couponPopup [style*="font-size:15px"] { font-size: 28px !important; }
+    #couponPopup [style*="font-size:13px"] { font-size: 22px !important; }
+    #couponPopup [style*="font-size:12px"] { font-size: 20px !important; }
+    /* 購物車 Modal */
+    #cartModal [style*="font-size:20px"] { font-size: 28px !important; }
+    #cartModal [style*="font-size:22px"] { font-size: 26px !important; }
+    #cartModal [style*="font-size:17px"] { font-size: 28px !important; }
+    #cartModal [style*="font-size:15px"] { font-size: 28px !important; }
+    #cartModal [style*="font-size:14px"] { font-size: 28px !important; }
+    #cartModal [style*="font-size:13px"] { font-size: 22px !important; }
+    #cartModal [style*="font-size:12px"] { font-size: 20px !important; }
+    #cartModal [style*="font-size:11px"] { font-size: 18px !important; }
+    /* 優惠券選擇 Modal */
+    #couponPickerModal [style*="font-size:20px"] { font-size: 28px !important; }
+    #couponPickerModal [style*="font-size:22px"] { font-size: 26px !important; }
+    #couponPickerModal [style*="font-size:17px"] { font-size: 28px !important; }
+    #couponPickerModal [style*="font-size:15px"] { font-size: 28px !important; }
+    #couponPickerModal [style*="font-size:14px"] { font-size: 28px !important; }
+    #couponPickerModal [style*="font-size:13px"] { font-size: 22px !important; }
+    #couponPickerModal [style*="font-size:12px"] { font-size: 20px !important; }
+    #couponPickerModal [style*="font-size:11px"] { font-size: 18px !important; }
+    /* 離開對話框 */
+    #exitDialog [style*="font-size:22px"] { font-size: 30px !important; }
+    #exitDialog [style*="font-size:17px"] { font-size: 28px !important; }
+    #exitDialog [style*="font-size:15px"] { font-size: 28px !important; }
+    /* 面板（訂單/優惠券）*/
+    #panelBox [style*="font-size:20px"] { font-size: 28px !important; }
+    #panelBox [style*="font-size:17px"] { font-size: 28px !important; }
+    #panelBox [style*="font-size:15px"] { font-size: 28px !important; }
+    #panelBox [style*="font-size:14px"] { font-size: 28px !important; }
+    #panelBox [style*="font-size:13px"] { font-size: 22px !important; }
+    #panelBox [style*="font-size:12px"] { font-size: 20px !important; }
+    #panelBox [style*="font-size:11px"] { font-size: 18px !important; }
+    /* 商品詳情 Modal */
+    #productModal [style*="font-size:20px"] { font-size: 28px !important; }
+    #productModal [style*="font-size:17px"] { font-size: 28px !important; }
+    #productModal [style*="font-size:15px"] { font-size: 28px !important; }
+    #productModal [style*="font-size:14px"] { font-size: 28px !important; }
+    #productModal [style*="font-size:13px"] { font-size: 22px !important; }
+    #productModal [style*="font-size:12px"] { font-size: 20px !important; }
+    #productModal [style*="font-size:11px"] { font-size: 18px !important; }
+    /* ═══ 遊戲主題 ═══ */
+    /* --- 背景：明亮藍天漸層，與參考圖一致 --- */
+    html { background: linear-gradient(160deg,#3b82f6 0%,#60a5fa 40%,#818cf8 80%,#6366f1 100%) !important; background-attachment: fixed !important; }
+    body { background: transparent !important; }
+    #app-shell { background: transparent !important; }
+
+    /* --- 浮動粒子特效 --- */
+    #app-shell::before {
+      content:'';
+      position:fixed; inset:0; z-index:0; pointer-events:none;
+      background:
+        radial-gradient(circle at 15% 20%, rgba(255,255,255,.18) 0%, transparent 40%),
+        radial-gradient(circle at 85% 70%, rgba(167,139,250,.22) 0%, transparent 45%),
+        radial-gradient(circle at 50% 90%, rgba(96,165,250,.15) 0%, transparent 50%);
+    }
+
+    /* --- Header --- */
+    #app-header { background: linear-gradient(135deg,rgba(37,99,235,.92),rgba(79,70,229,.92)) !important; backdrop-filter:blur(12px); border-bottom: 1.5px solid rgba(255,255,255,.25) !important; box-shadow: 0 4px 24px rgba(37,99,235,.35) !important; }
+    #app-header .text-xl.font-bold { color:#fff !important; text-shadow:0 1px 6px rgba(0,0,0,.3); }
+    #app-header .w-9.h-9.rounded-lg { background:linear-gradient(135deg,#f97316,#ef4444) !important; box-shadow:0 2px 8px rgba(239,68,68,.5); }
+    #app-header .border.border-gray-200 { border:none !important; background:linear-gradient(135deg,rgba(67,97,238,.85),rgba(124,58,237,.85)) !important; box-shadow:0 2px 10px rgba(79,70,229,.4),inset 0 1px 0 rgba(255,255,255,.25); }
+    #app-header .text-gray-700 { color:rgba(255,255,255,.95) !important; }
+    #app-header .bg-gray-200 { background:rgba(255,255,255,.2) !important; }
+    #app-header .text-gray-500 { color:rgba(255,255,255,.75) !important; }
+    #app-header button.border-2 { border:none !important; color:#fff !important; background:linear-gradient(135deg,rgba(67,97,238,.85),rgba(124,58,237,.85)) !important; box-shadow:0 2px 10px rgba(79,70,229,.4),inset 0 1px 0 rgba(255,255,255,.25); }
+    #app-header button.border-2:hover { background:linear-gradient(135deg,rgba(87,117,255,.95),rgba(139,73,247,.95)) !important; }
+
+    /* --- Tab bar --- */
+    #tabs { background:rgba(255,255,255,.1) !important; backdrop-filter:blur(8px); border-bottom:1.5px solid rgba(255,255,255,.2) !important; display:flex !important; }
+    #tabs button { color:rgba(255,255,255,.65) !important; background:transparent !important; font-size:28px !important; }
+    #tabs button.tab-active { color:#fff !important; background:linear-gradient(180deg,#4f8ef7,#1845c8) !important; font-weight:800 !important; box-shadow:0 3px 0 rgba(14,50,140,.6),0 5px 12px rgba(24,69,200,.4),inset 0 1.5px 0 rgba(255,255,255,.3) !important; }
+    /* 小螢幕隱藏 icon，只顯示文字 */
+    @media (max-width:480px) {
+      #tabs button { font-size:24px !important; padding:8px 4px !important; gap:3px !important; }
+      #tabs button svg { display:none !important; }
+    }
+
+    /* --- Main area --- */
+    #main-layout, #main-content { background:transparent !important; }
+
+    /* --- Section titles --- */
+    #main-content .text-lg.font-bold, #main-content .text-xl.font-bold, #flash-sale .text-lg.font-bold { color:#fff !important; text-shadow:0 2px 8px rgba(0,0,0,.25); }
+    #main-content .text-gray-800 { color:#fff !important; }
+    #main-content .text-gray-600:not(button) { color:rgba(255,255,255,.8) !important; }
+    #flash-sale .text-red-500.text-sm { color:#fde68a !important; font-weight:700; }
+
+    /* --- Product cards: 白底毛玻璃卡片 + 立體感 --- */
+    #tab-content-all .bg-white, #tab-content-diamond .bg-white,
+    #tab-content-icoin .bg-white, #tab-content-items .bg-white,
+    #flash-sale .bg-white {
+      background: linear-gradient(160deg,rgba(255,255,255,.98),rgba(235,240,255,.95)) !important;
+      border: 1.5px solid rgba(255,255,255,.85) !important;
+      border-bottom: 1.5px solid rgba(180,180,220,.35) !important;
+      box-shadow:
+        0 5px 0 rgba(99,102,241,.18),
+        0 8px 24px rgba(79,70,229,.18),
+        0 2px 6px rgba(0,0,0,.10),
+        inset 0 1.5px 0 rgba(255,255,255,.95) !important;
+      transition: transform .18s, box-shadow .18s !important;
+      overflow: hidden !important;
+    }
+
+    /* --- 商品卡片：有 padding，紫色區塊有留白 --- */
+    #tab-content-all .bg-white, #tab-content-diamond .bg-white,
+    #tab-content-icoin .bg-white, #tab-content-items .bg-white {
+      padding: 10px 10px 12px !important;
+      align-items: center !important;
+      justify-content: flex-start !important;
+      overflow: visible !important;
+    }
+    /* --- 圖片區：紫色圓角背景，置中不貼邊 --- */
+    #tab-content-all .bg-white > .my-3,
+    #tab-content-diamond .bg-white > .my-3,
+    #tab-content-icoin .bg-white > .my-3,
+    #tab-content-items .bg-white > .my-3 {
+      order: 0 !important;
+      margin: 0 !important;
+      padding: 14px 10px 8px !important;
+      width: 100% !important;
+      background: radial-gradient(ellipse at 50% 40%, #a855f7 0%, #7c3aed 50%, #5b21b6 100%) !important;
+      border-radius: 10px 10px 0 0 !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+    }
+    /* --- 名稱列：接續圖塊底部，同在紫色區塊內 --- */
+    #tab-content-all .bg-white > .text-xs.text-gray-700.font-medium,
+    #tab-content-diamond .bg-white > .text-xs.text-gray-700.font-medium,
+    #tab-content-icoin .bg-white > .text-xs.text-gray-700.font-medium,
+    #tab-content-items .bg-white > .text-xs.text-gray-700.font-medium {
+      order: 1 !important;
+      margin: 0 0 10px !important;
+      padding: 6px 6px 12px !important;
+      background: #5b21b6 !important;
+      color: rgba(255,255,255,.95) !important;
+      font-weight: 700 !important;
+      text-shadow: 0 1px 3px rgba(0,0,0,.3) !important;
+      text-align: center !important;
+      width: 100% !important;
+      flex-shrink: 0 !important;
+      border-radius: 0 0 10px 10px !important;
+    }
+    /* --- 價格按鈕 --- */
+    #tab-content-all .bg-white > button,
+    #tab-content-diamond .bg-white > button,
+    #tab-content-icoin .bg-white > button,
+    #tab-content-items .bg-white > button {
+      order: 2 !important;
+      margin: 0 !important;
+      border-radius: 9999px !important;
+      border-top: none !important;
+      width: 100% !important;
+      flex-shrink: 0 !important;
+    }
+    /* ribbon 位置 */
+    #tab-content-all .bg-white > .absolute,
+    #tab-content-diamond .bg-white > .absolute,
+    #tab-content-icoin .bg-white > .absolute,
+    #tab-content-items .bg-white > .absolute {
+      top: 6px !important;
+      left: 6px !important;
+    }
+    #tab-content-all .bg-white:hover, #tab-content-diamond .bg-white:hover,
+    #tab-content-icoin .bg-white:hover, #tab-content-items .bg-white:hover,
+    #flash-sale .bg-white:hover {
+      transform: translateY(-5px) !important;
+      box-shadow:
+        0 8px 0 rgba(99,102,241,.22),
+        0 16px 36px rgba(79,70,229,.30),
+        0 6px 14px rgba(0,0,0,.13),
+        inset 0 1.5px 0 rgba(255,255,255,.95) !important;
+    }
+
+    /* --- Milestone chest tooltip --- */
+    .chest-tip { position: relative; cursor: default; }
+    .chest-tip::after {
+      content: attr(data-tip);
+      position: absolute;
+      left: 0; bottom: calc(100% + 8px);
+      transform: none;
+      background: rgba(20,20,40,.92);
+      color: #fff; font-size: 12px; font-weight: 700;
+      padding: 5px 11px; border-radius: 8px;
+      white-space: nowrap; pointer-events: none;
+      opacity: 0; transition: opacity .18s;
+      box-shadow: 0 3px 10px rgba(0,0,0,.35);
+      border: 1px solid rgba(255,255,255,.12);
+      z-index: 200;
+    }
+    .chest-tip::before {
+      content: '';
+      position: absolute;
+      left: 15px; bottom: calc(100% + 3px);
+      transform: none;
+      border: 5px solid transparent;
+      border-top-color: rgba(20,20,40,.92);
+      opacity: 0; transition: opacity .18s;
+      pointer-events: none; z-index: 200;
+    }
+    .chest-tip:hover::after, .chest-tip:hover::before { opacity: 1; }
+
+    /* --- Product icon area: 紫色漸層底 --- */
+    #tab-content-all .my-3, #tab-content-diamond .my-3,
+    #tab-content-icoin .my-3, #tab-content-items .my-3 {
+      background: linear-gradient(145deg,#7c3aed,#6d28d9,#4f46e5) !important;
+      border-radius:12px !important; padding:14px 10px !important; width:100% !important;
+      box-shadow: 0 4px 14px rgba(109,40,217,.35), inset 0 1px 0 rgba(255,255,255,.18) !important;
+      border: 1.5px solid rgba(139,92,246,.4) !important;
+    }
+
+    /* --- Flash sale emoji icon area --- */
+    #flash-sale .text-4xl {
+      background: none !important;
+      border-radius:12px !important; padding:12px 18px !important;
+      border: none !important;
+      box-shadow: none !important;
+    }
+
+    /* --- Timer: 大字清晰倒數（無光暈）--- */
+    [id^="timer-"] {
+      color:#dc2626 !important;
+      background: none !important;
+      padding:0 !important;
+      border-radius:0 !important;
+      border:none !important;
+      font-weight:900 !important;
+      font-size:18px !important;
+      font-family:'Courier New',Consolas,monospace !important;
+      display:inline-block !important;
+      letter-spacing:0.08em !important;
+      margin-top:6px !important;
+      box-shadow:none !important;
+      text-shadow:none !important;
+      animation:none !important;
+    }
+
+    /* --- 商品卡片購買按鈕：橘金立體感 --- */
+    #tab-content-all button[style*="#c0392b"], #tab-content-diamond button[style*="#c0392b"],
+    #tab-content-icoin button[style*="#c0392b"], #tab-content-items button[style*="#c0392b"] {
+      background: linear-gradient(180deg,#fb923c,#ea580c) !important;
+      box-shadow: 0 2px 1px rgba(154,52,18,.5), 0 4px 5px rgba(154,52,18,.25),
+                  0 7px 14px rgba(154,52,18,.12),
+                  inset 0 2px 0 rgba(255,255,255,.45),
+                  inset 0 1px 6px rgba(255,255,255,.25) !important;
+      border-radius: 9999px !important;
+      transition: transform .1s, box-shadow .1s !important;
+      border: none !important;
+      padding: 8px 10px !important;
+      font-size: 13px !important;
+    }
+    #tab-content-all button[style*="#c0392b"]:active, #tab-content-diamond button[style*="#c0392b"]:active,
+    #tab-content-icoin button[style*="#c0392b"]:active, #tab-content-items button[style*="#c0392b"]:active {
+      box-shadow: 0 1px 1px rgba(154,52,18,.4), 0 2px 4px rgba(154,52,18,.15),
+                  inset 0 1px 0 rgba(255,255,255,.2) !important;
+    }
+    #tab-content-all button[style*="#c0392b"] svg, #tab-content-diamond button[style*="#c0392b"] svg,
+    #tab-content-icoin button[style*="#c0392b"] svg, #tab-content-items button[style*="#c0392b"] svg {
+      width: 20px !important; height: 20px !important; flex-shrink: 0;
+    }
+    #tab-content-all button[style*="#c0392b"]:active, #tab-content-diamond button[style*="#c0392b"]:active,
+    #tab-content-icoin button[style*="#c0392b"]:active, #tab-content-items button[style*="#c0392b"]:active {
+      transform: translateY(3px) !important;
+      box-shadow: 0 1px 1px rgba(154,52,18,.4), 0 2px 4px rgba(154,52,18,.15) !important;
+    }
+
+    /* --- Flash sale: 三張卡片按鈕統一橘色 --- */
+    #flash-sale .grid > div:nth-child(1) button:not([disabled]),
+    #flash-sale .grid > div:nth-child(2) button:not([disabled]),
+    #flash-sale .grid > div:nth-child(3) button:not([disabled]) {
+      background: linear-gradient(180deg,#fb923c,#ea580c) !important;
+      box-shadow: 0 2px 1px rgba(154,52,18,.5), 0 4px 5px rgba(154,52,18,.25),
+                  0 7px 14px rgba(154,52,18,.12),
+                  inset 0 2px 0 rgba(255,255,255,.45),
+                  inset 0 1px 6px rgba(255,255,255,.25) !important;
+      border-radius: 9999px !important;
+      transition: transform .1s, box-shadow .1s !important;
+    }
+    #flash-sale .grid > div:nth-child(1) button:not([disabled]):active,
+    #flash-sale .grid > div:nth-child(2) button:not([disabled]):active,
+    #flash-sale .grid > div:nth-child(3) button:not([disabled]):active { transform:translateY(3px) !important; box-shadow:0 1px 1px rgba(154,52,18,.4),0 2px 4px rgba(154,52,18,.15) !important; }
+    #flash-sale .grid > div:nth-child(3) button:not([disabled]):active { transform:translateY(3px) !important; box-shadow:0 1px 1px rgba(154,52,18,.4),0 2px 4px rgba(154,52,18,.15) !important; }
+
+    /* --- Section separator: 限時搶購與商品格線間距 --- */
+    #tab-content-all { margin-top: 12px !important; }
+    #tab-content-all .grid { margin-top: 4px !important; }
+    #flash-sale { margin-bottom: 4px !important; }
+    #tab-content-all, #tab-content-diamond, #tab-content-icoin, #tab-content-items {
+      padding-bottom: max(80px, env(safe-area-inset-bottom)) !important;
+    }
+    #tab-content-diamond, #tab-content-icoin, #tab-content-items {
+      margin-top: 44px !important;
+    }
+
+    /* --- Right sidebar --- */
+    #right-sidebar { background:rgba(255,255,255,.15) !important; backdrop-filter:blur(10px); border-left:1.5px solid rgba(255,255,255,.3) !important; }
+    #right-sidebar .text-gray-800 { color:#fff !important; }
+    #right-sidebar .text-gray-600, #right-sidebar .text-gray-500, #right-sidebar .text-gray-400 { color:rgba(255,255,255,.72) !important; }
+    #right-sidebar .font-bold.text-sm { color:#fff !important; }
+    #right-sidebar .bg-white { background:rgba(255,255,255,.18) !important; border:1px solid rgba(255,255,255,.3) !important; }
+    #right-sidebar .bg-orange-50 { background:rgba(251,191,36,.18) !important; }
+    #right-sidebar [style*="border-color:#86efac"] { border-color:rgba(74,222,128,.5) !important; }
+    #right-sidebar .text-gray-800.font-semibold { color:#fff !important; }
+    #right-sidebar .font-bold.text-red-500 { color:#fca5a5 !important; }
+
+    /* --- Left bar --- */
+    #leftBar > div { background: linear-gradient(160deg,rgba(255,255,255,.98),rgba(235,240,255,.95)) !important; backdrop-filter:none !important; border-left:1.5px solid rgba(255,255,255,.88) !important; border-right:1.5px solid rgba(180,180,220,.35) !important; box-shadow:6px 0 0 rgba(99,102,241,.18),12px 0 0 rgba(99,102,241,.07),20px 0 40px rgba(79,70,229,.22),inset -2px 0 0 rgba(255,255,255,.9) !important; }
+    #leftBar .font-bold.text-gray-800 { color:#1e293b !important; }
+    #leftBar .text-gray-400, #leftBar .text-gray-500 { color:#6b7280 !important; }
+    #leftBar .border-gray-100 { border-color:#f3f4f6 !important; }
+    #leftBar .bg-gray-100, #leftBar .bg-gray-50 { background:#f3f4f6 !important; }
+    #leftBar .text-2xl.font-extrabold { color:#dc2626 !important; }
+
+    /* --- Banner --- */
+    #banner { box-shadow:0 6px 28px rgba(79,70,229,.3) !important; border-radius:14px !important; overflow:hidden !important; }
+
+    /* --- 浮動購物車按鈕立體感 --- */
+    #floatCart {
+      background: linear-gradient(170deg,#ff6b6b 0%,#ef4444 30%,#dc2626 65%,#b91c1c 100%) !important;
+      box-shadow:
+        0 8px 0 #7f1d1d,
+        0 10px 0 rgba(127,29,29,.5),
+        0 14px 30px rgba(220,38,38,.55),
+        inset 0 2px 0 rgba(255,255,255,.45),
+        inset 0 -2px 4px rgba(0,0,0,.2) !important;
+      transition: transform .12s, box-shadow .12s !important;
+    }
+    #floatCart:hover:not(.cart-active) {
+      transform: translateY(-2px) scale(1.03) !important;
+      box-shadow:
+        0 10px 0 #7f1d1d,
+        0 13px 0 rgba(127,29,29,.5),
+        0 18px 35px rgba(220,38,38,.6),
+        inset 0 2px 0 rgba(255,255,255,.45),
+        inset 0 -2px 4px rgba(0,0,0,.2) !important;
+    }
+    #floatCart:active { transform:translateY(6px) !important; box-shadow:0 2px 0 #7f1d1d, 0 3px 8px rgba(220,38,38,.3), inset 0 2px 4px rgba(0,0,0,.25) !important; }
+    @keyframes cart-active-pulse {
+      0%   { transform:translateY(0) scale(1);    box-shadow:0 8px 0 #7f1d1d, 0 14px 30px rgba(220,38,38,.55), 0 0 0 0 rgba(220,38,38,.7), inset 0 2px 0 rgba(255,255,255,.45); }
+      40%  { transform:translateY(-7px) scale(1.09); box-shadow:0 12px 0 #7f1d1d, 0 20px 36px rgba(220,38,38,.65), 0 0 0 14px rgba(220,38,38,.0), inset 0 2px 0 rgba(255,255,255,.45); }
+      60%  { transform:translateY(-4px) scale(1.05); }
+      80%  { transform:translateY(-6px) scale(1.07); }
+      100% { transform:translateY(0) scale(1);    box-shadow:0 8px 0 #7f1d1d, 0 14px 30px rgba(220,38,38,.55), 0 0 0 0 rgba(220,38,38,.0), inset 0 2px 0 rgba(255,255,255,.45); }
+    }
+    #floatCart.cart-active {
+      animation: cart-active-pulse 1.2s ease-in-out infinite !important;
+    }
+    #floatCart .fc-shine {
+      position:absolute;top:8px;left:50%;transform:translateX(-50%);
+      width:60%;height:28%;border-radius:50%;
+      background:linear-gradient(180deg,rgba(255,255,255,.55),rgba(255,255,255,.0));
+      pointer-events:none;
+    }
+
+    /* --- 滿額贈禮當前階段動態 --- */
+    @keyframes gift-bounce {
+      0%, 100% { transform: scale(1) rotate(0deg); }
+      20%  { transform: scale(1.25) rotate(-10deg); }
+      50%  { transform: scale(1.25) rotate(10deg); }
+      80%  { transform: scale(1.1) rotate(-5deg); }
+    }
+    @keyframes gift-ring {
+      0%   { box-shadow: 0 0 0 0 rgba(232,119,34,.75), 0 3px 6px rgba(180,83,9,.4); }
+      70%  { box-shadow: 0 0 0 12px rgba(232,119,34,.0), 0 3px 6px rgba(180,83,9,.4); }
+      100% { box-shadow: 0 0 0 0 rgba(232,119,34,.0), 0 3px 6px rgba(180,83,9,.4); }
+    }
+    #gift-current, .gift-current-anim {
+      animation: gift-bounce 1.4s ease-in-out infinite, gift-ring 1.4s ease-in-out infinite !important;
+    }
+
+    /* ── Safe Area (iPhone notch / Dynamic Island) ── */
+    #app-header {
+      padding-left: max(20px, env(safe-area-inset-left)) !important;
+      padding-right: max(20px, env(safe-area-inset-right)) !important;
+      padding-top: max(12px, env(safe-area-inset-top)) !important;
+    }
+    #tabs {
+      padding-left: max(12px, env(safe-area-inset-left)) !important;
+      padding-right: max(12px, env(safe-area-inset-right)) !important;
+    }
+    #main-content {
+      padding-left: max(20px, env(safe-area-inset-left)) !important;
+      padding-right: max(20px, env(safe-area-inset-right)) !important;
+    }
+    #floatCart {
+      bottom: max(24px, env(safe-area-inset-bottom)) !important;
+      right: max(24px, env(safe-area-inset-right)) !important;
+    }
+    @media (max-width: 640px) {
+      #app-header {
+        padding-left: max(12px, env(safe-area-inset-left)) !important;
+        padding-right: max(12px, env(safe-area-inset-right)) !important;
+      }
+      #main-content {
+        padding-left: max(12px, env(safe-area-inset-left)) !important;
+        padding-right: max(12px, env(safe-area-inset-right)) !important;
+        padding-bottom: max(100px, calc(env(safe-area-inset-bottom) + 80px)) !important;
+      }
+      #floatCart {
+        bottom: max(20px, env(safe-area-inset-bottom)) !important;
+        right: max(16px, env(safe-area-inset-right)) !important;
+      }
+    }
+    @media (orientation: landscape) and (max-height: 600px) {
+      #app-header {
+        padding-left: max(12px, env(safe-area-inset-left)) !important;
+        padding-right: max(12px, env(safe-area-inset-right)) !important;
+      }
+      #tabs {
+        padding-left: max(12px, env(safe-area-inset-left)) !important;
+        padding-right: max(12px, env(safe-area-inset-right)) !important;
+      }
+      #main-content {
+        padding-left: max(12px, env(safe-area-inset-left)) !important;
+        padding-right: max(12px, env(safe-area-inset-right)) !important;
+      }
+      #floatCart {
+        bottom: max(16px, env(safe-area-inset-bottom)) !important;
+        right: max(16px, env(safe-area-inset-right)) !important;
+      }
+    }
+
+    /* ── Mobile Responsive ── */
+    @media (max-width: 640px) {
+      html, body { overflow-x: hidden; overflow-y: auto; height: auto; }
+      #app-shell { height: auto !important; min-height: 100vh; overflow: visible !important; }
+      #app-header { padding-left: 12px; padding-right: 12px; }
+      #btn-pwa, #btn-help { display: none !important; }
+      #username-text { display: none !important; }
+      #tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap;
+              padding-left: 12px; padding-right: 12px; gap: 6px; }
+      #tabs button { flex-shrink: 0; }
+      #banner { height: 180px !important; border-radius: 12px !important; overflow: hidden !important; }
+      #banner .slide { padding: 0 !important; }
+      #banner img { width: 100% !important; height: 100% !important; object-fit: cover !important; object-position: center !important; }
+      #main-layout { height: auto !important; overflow: visible !important; flex-direction: column; }
+      #main-content { height: auto !important; overflow: visible !important; padding: 12px 12px 100px !important; }
+      #right-sidebar { display: none !important; }
+      #leftBar { display: none !important; }
+      [class*="grid-cols-4"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+      [class*="grid-cols-3"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+      .modal-overlay { position: fixed !important; }
+      .panel-overlay { position: fixed !important; }
+      .panel-box { width: 100% !important; left: 0 !important; right: 0 !important; position: fixed !important; }
+      .modal-box { max-width: calc(100vw - 24px) !important; }
+      #couponPopup > div { max-width: calc(100vw - 24px) !important; width: 100% !important; }
+      .toast { position: fixed !important; bottom: 80px !important; }
+      #floatCart { position: fixed !important; bottom: 20px !important; right: 16px !important; width: 72px !important; height: 72px !important; }
+      #floatCart svg { width: 32px !important; height: 32px !important; }
+      #floatCart .fc-label { font-size: 13px !important; margin-top: 2px !important; letter-spacing: 0.05em !important; }
+      #floatCart #cartBadge { width: 22px !important; height: 22px !important; font-size: 11px !important; top: 2px !important; right: 2px !important; border-width: 1.5px !important; }
+      #flash-sale .absolute.top-0.right-0 { font-size: 15px !important; padding: 3px 10px !important; }
+      #mobileGifts { display: block !important; }
+      #mobileAddon { display: block !important; }
+    }
+
+    /* ── 手機全局：無論橫/直向，960px 以下一律隱藏 leftBar（避免 iPhone notch 遮蓋） ── */
+    @media (max-width: 960px) {
+      #leftBar { display: none !important; visibility: hidden !important; pointer-events: none !important; }
+    }
+
+    /* ── Landscape phone (e.g. iPhone 橫向) ── */
+    @media (orientation: landscape) and (max-height: 600px) {
+      html, body { overflow-x: hidden; overflow-y: auto; height: auto; }
+      #app-shell { height: auto !important; min-height: 100vh; overflow: visible !important; }
+      #btn-pwa, #btn-help { display: none !important; }
+      #username-text { display: none !important; }
+      #tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; gap: 6px; }
+      #tabs button { flex-shrink: 0; }
+      #main-layout { height: auto !important; overflow: visible !important; }
+      #main-content { height: auto !important; overflow: visible !important; padding: 12px 12px 100px !important; }
+      #right-sidebar { display: none !important; }
+      #leftBar { display: none !important; }
+      [class*="grid-cols-4"] { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+      .modal-overlay { position: fixed !important; }
+      .panel-overlay { position: fixed !important; }
+      .panel-box { width: 100% !important; left: 0 !important; right: 0 !important; position: fixed !important; }
+      .modal-box { max-width: calc(100vw - 24px) !important; }
+      .toast { position: fixed !important; bottom: 80px !important; }
+      #floatCart { position: fixed !important; bottom: 16px !important; right: 16px !important; width: 72px !important; height: 72px !important; }
+      #floatCart svg { width: 32px !important; height: 32px !important; }
+      #floatCart .fc-label { font-size: 13px !important; margin-top: 2px !important; }
+      #floatCart #cartBadge { width: 22px !important; height: 22px !important; font-size: 11px !important; top: 2px !important; right: 2px !important; border-width: 1.5px !important; }
+      #banner { height: 160px !important; border-radius: 10px !important; overflow: hidden !important; }
+      #banner .slide { padding: 0 !important; }
+      #banner img { width: 100% !important; height: 100% !important; object-fit: cover !important; object-position: center !important; }
+    }
+  </style>
+</head>
+<body>
+<div id="app-shell">
+
+<!-- ===== HEADER ===== -->
+<header id="app-header" class="flex items-center justify-between px-5 py-3 bg-white shadow-sm sticky top-0 z-40">
+  <div class="flex items-center gap-2">
+    <img src="images/logo.png" class="h-9 w-auto" alt="明星商城" style="border-radius:8px;object-fit:contain">
+    <img src="images/title.png" alt="明星商城" style="height:64px;width:auto;object-fit:contain">
+  </div>
+  <div class="flex items-center gap-2">
+    <!-- PWA install -->
+    <button id="btn-pwa" title="安裝 PWA" class="w-10 h-10 rounded-full border-2 border-blue-500 flex items-center justify-center text-blue-500 hover:bg-blue-50">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17 1.01 7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14zm-4-6h-2v2H9v-2H7v-2h2v-2h2v2h2v2z"/></svg>
+    </button>
+    <!-- 玩家暱稱 -->
+    <button class="flex items-center gap-2 px-3 py-2 rounded-full border border-gray-200 hover:bg-gray-50">
+      <div class="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.7 0 4-1.8 4-4s-1.3-4-4-4-4 1.8-4 4 1.3 4 4 4zm0 2c-4 0-6 2-6 3v1h12v-1c0-1-2-3-6-3z"/></svg>
+      </div>
+      <span id="username-text" class="text-sm text-gray-700">王大明愛老虎</span>
+    </button>
+    <!-- 商城說明 -->
+    <button id="btn-help" title="商城說明" class="w-10 h-10 rounded-full border-2 border-blue-500 flex items-center justify-center text-blue-600 font-bold hover:bg-blue-50">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg>
+    </button>
+    <!-- 訂單記錄 -->
+    <button onclick="openPanel('order')" title="訂單記錄" class="w-10 h-10 rounded-full border-2 border-blue-500 flex items-center justify-center text-blue-500 hover:bg-blue-50">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8v-2zm0-4h8v2H8v-2z"/></svg>
+    </button>
+    <!-- 我的優惠券 -->
+    <button onclick="openPanel('coupon')" title="我的優惠券" class="w-10 h-10 rounded-full flex items-center justify-center text-white hover:opacity-90"
+            style="background:linear-gradient(135deg,rgba(67,97,238,.85),rgba(124,58,237,.85));box-shadow:0 2px 10px rgba(79,70,229,.4),inset 0 1px 0 rgba(255,255,255,.25)">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M22 10V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v4a2 2 0 1 1 0 4v4a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-4a2 2 0 1 1 0-4z"/></svg>
+    </button>
+    <!-- 關閉 ╳ -->
+    <button onclick="tryClose()" class="w-10 h-10 rounded-full border-2 border-gray-300 flex items-center justify-center text-gray-500 hover:bg-gray-100 font-bold text-sm ml-1">╳</button>
+  </div>
+</header>
+
+<!-- ===== CATEGORY TABS ===== -->
+<div style="display:flex;align-items:center;padding:10px 16px;background:rgba(255,255,255,.12);backdrop-filter:blur(8px);border-bottom:1.5px solid rgba(255,255,255,.2);overflow:hidden" id="tabs">
+  <div style="display:inline-flex;align-items:center;background:rgba(0,0,0,.32);border-radius:9999px;padding:4px;gap:2px;box-shadow:inset 0 2px 4px rgba(0,0,0,.35),0 1px 0 rgba(255,255,255,.12)">
+    <button onclick="setTab('all')" id="tab-all"
+      style="display:flex;align-items:center;justify-content:center;gap:5px;padding:9px 16px;border-radius:9999px;border:none;cursor:pointer;font-weight:700;transition:all .2s;white-space:nowrap">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+      全部
+    </button>
+    <button onclick="setTab('diamond')" id="tab-diamond"
+      style="display:flex;align-items:center;justify-content:center;gap:5px;padding:9px 16px;border-radius:9999px;border:none;cursor:pointer;font-weight:600;transition:all .2s;white-space:nowrap">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5L2 9l10 12L22 9l-3-6zm-7 13.5L5.5 9.5h13L12 16.5zm1.5-7.5h-3l-1-3h5l-1 3zm-7.41 0H3.5l2-4h3l-2.91 4zm10.82 0L14 9h3l2 4h-2.09z"/></svg>
+      鑽石
+    </button>
+    <button onclick="setTab('icoin')" id="tab-icoin"
+      style="display:flex;align-items:center;justify-content:center;gap:5px;padding:9px 16px;border-radius:9999px;border:none;cursor:pointer;font-weight:600;transition:all .2s;white-space:nowrap">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+      i 幣
+    </button>
+    <button onclick="setTab('items')" id="tab-items"
+      style="display:flex;align-items:center;justify-content:center;gap:5px;padding:9px 16px;border-radius:9999px;border:none;cursor:pointer;font-weight:600;transition:all .2s;white-space:nowrap">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M20 6h-2.18c.07-.44.18-.88.18-1.33C18 2.54 15.75.5 13 .5S8 2.54 8 4.67c0 .45.11.89.18 1.33H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2zm-7-3.33c1.25 0 2.33.86 2.33 2C15.33 5.8 14.25 6.67 13 6.67S10.67 5.8 10.67 4.67c0-1.14 1.08-2 2.33-2zm7 19.33H6V8h2v2h2V8h6v2h2V8h2v14z"/></svg>
+      道具與其它
+    </button>
+  </div>
+</div>
+
+<!-- ===== MAIN LAYOUT ===== -->
+<div id="main-layout" class="flex" style="height:calc(100vh - 112px);overflow:hidden">
+
+  <!-- Main content -->
+    <div id="main-content" class="flex-1 p-5 min-w-0 overflow-y-auto" style="height:calc(100vh - 112px);padding-bottom:max(40px,env(safe-area-inset-bottom))">
+
+    <!-- ===== MOBILE MILESTONE STRIP (portrait only) ===== -->
+    <div id="mobileGifts" style="display:none;margin-bottom:14px">
+      <!-- 整體容器：展開時統一圓角 -->
+      <div id="mgWrapper" style="border-radius:14px;overflow:hidden;box-shadow:0 4px 12px rgba(99,102,241,.35);border:1.5px solid rgba(99,102,241,.3)">
+      <!-- Collapsed header row -->
+      <div onclick="toggleMobileGifts()" style="background:linear-gradient(135deg,#1845c8,#7c3aed);padding:11px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;box-shadow:inset 0 1.5px 0 rgba(255,255,255,.22)">
+        <span style="font-size:22px;filter:drop-shadow(0 1px 3px rgba(0,0,0,.3));flex-shrink:0">🎁</span>
+        <div style="flex:0 0 auto">
+          <div style="color:rgba(255,255,255,.75);font-size:10px;font-weight:600;letter-spacing:.04em">本月已累積</div>
+          <div style="color:#fff;font-size:17px;font-weight:900;text-shadow:0 1px 3px rgba(0,0,0,.3)">NT$ 30,000</div>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="background:rgba(255,255,255,.22);border-radius:4px;height:7px;overflow:hidden;margin-bottom:3px">
+            <div style="width:15%;height:100%;background:linear-gradient(90deg,#4ade80,#fb923c);border-radius:4px"></div>
+          </div>
+          <div style="color:rgba(255,255,255,.7);font-size:10px;font-weight:600">距下一禮 $50,000</div>
+        </div>
+        <div id="mgArrow" style="color:rgba(255,255,255,.85);font-size:20px;line-height:1;transition:transform .3s;flex-shrink:0">▾</div>
+      </div>
+      <!-- Expanded detail -->
+      <div id="mgExpanded" style="display:none;background:linear-gradient(160deg,#eef2ff,#f5f3ff);padding:14px 12px 10px">
+        <!-- Horizontal scrollable milestones -->
+        <div style="display:flex;align-items:flex-start;overflow-x:auto;padding-bottom:6px;padding-top:50px;margin-top:-50px;scrollbar-width:none;-webkit-overflow-scrolling:touch">
+          <style>#mgExpanded > div:first-child::-webkit-scrollbar{display:none}</style>
+          <!-- $0 completed -->
+          <div style="display:flex;flex-direction:column;align-items:center;flex:0 0 auto;width:60px">
+            <div class="chest-tip" data-tip="魔法石禮盒 Ⅰ" style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#bbf7d0,#4ade80);border:1.5px solid rgba(34,197,94,.4);box-shadow:0 2px 6px rgba(22,163,74,.3);display:flex;align-items:center;justify-content:center;position:relative">
+              <img src="images/box/img_MagicStone_Box_4.png" style="width:26px;height:26px;object-fit:contain">
+              <span style="position:absolute;bottom:-2px;right:-2px;background:#16a34a;color:#fff;font-size:8px;font-weight:800;width:13px;height:13px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1.5px solid #fff">✓</span>
+            </div>
+            <div style="font-size:10px;font-weight:600;color:#16a34a;margin-top:4px;text-decoration:line-through;opacity:.8">$0</div>
+          </div>
+          <div style="flex:1;min-width:16px;height:3px;background:#4ade80;align-self:center;margin-bottom:18px;border-radius:2px"></div>
+          <!-- $10,000 completed -->
+          <div style="display:flex;flex-direction:column;align-items:center;flex:0 0 auto;width:64px">
+            <div class="chest-tip" data-tip="魔法石禮盒 Ⅱ" style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#bbf7d0,#4ade80);border:1.5px solid rgba(34,197,94,.4);box-shadow:0 2px 6px rgba(22,163,74,.3);display:flex;align-items:center;justify-content:center;position:relative">
+              <img src="images/box/img_MagicStone_Box_5.png" style="width:26px;height:26px;object-fit:contain">
+              <span style="position:absolute;bottom:-2px;right:-2px;background:#16a34a;color:#fff;font-size:8px;font-weight:800;width:13px;height:13px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1.5px solid #fff">✓</span>
+            </div>
+            <div style="font-size:10px;font-weight:600;color:#16a34a;margin-top:4px;text-decoration:line-through;opacity:.8">$10,000</div>
+          </div>
+          <div style="flex:1;min-width:16px;height:3px;background:linear-gradient(90deg,#4ade80,#fb923c);align-self:center;margin-bottom:18px;border-radius:2px"></div>
+          <!-- $30,000 current -->
+          <div style="display:flex;flex-direction:column;align-items:center;flex:0 0 auto;width:68px">
+            <div class="chest-tip gift-current-anim" data-tip="橙金砲彈礼盒" style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#fed7aa,#fb923c);border:2px solid rgba(255,255,255,.8);box-shadow:0 0 0 3px rgba(234,88,12,.3),0 3px 10px rgba(234,88,12,.4);display:flex;align-items:center;justify-content:center">
+              <img src="images/box/img_Warhead_Box_2.png" style="width:30px;height:30px;object-fit:contain;filter:drop-shadow(0 2px 4px rgba(0,0,0,.3))">
+            </div>
+            <div style="font-size:11px;font-weight:800;color:#ea580c;margin-top:4px">$30,000</div>
+            <div style="font-size:9px;font-weight:700;color:#f97316">▶ 目前</div>
+          </div>
+          <div style="flex:1;min-width:16px;height:3px;background:#d1d5db;align-self:center;margin-bottom:18px;border-radius:2px"></div>
+          <!-- $80,000 pending -->
+          <div style="display:flex;flex-direction:column;align-items:center;flex:0 0 auto;width:64px">
+            <div class="chest-tip" data-tip="紫色砲彈礼盒" style="width:38px;height:38px;border-radius:50%;background:rgba(209,213,219,.45);border:1.5px solid rgba(209,213,219,.7);display:flex;align-items:center;justify-content:center">
+              <img src="images/box/img_Warhead_Box_3.png" style="width:26px;height:26px;object-fit:contain;opacity:.7">
+            </div>
+            <div style="font-size:10px;font-weight:600;color:#6b7280;margin-top:4px">$80,000</div>
+          </div>
+          <div style="flex:1;min-width:16px;height:3px;background:#d1d5db;align-self:center;margin-bottom:18px;border-radius:2px"></div>
+          <!-- $150,000 pending -->
+          <div style="display:flex;flex-direction:column;align-items:center;flex:0 0 auto;width:64px">
+            <div class="chest-tip" data-tip="彩虹砲彈礼盒" style="width:38px;height:38px;border-radius:50%;background:rgba(209,213,219,.45);border:1.5px solid rgba(209,213,219,.7);display:flex;align-items:center;justify-content:center">
+              <img src="images/box/img_Warhead_Box_1.png" style="width:26px;height:26px;object-fit:contain;opacity:.7">
+            </div>
+            <div style="font-size:10px;font-weight:600;color:#6b7280;margin-top:4px">$150,000</div>
+          </div>
+          <div style="flex:1;min-width:16px;height:3px;background:#d1d5db;align-self:center;margin-bottom:18px;border-radius:2px"></div>
+          <!-- $200,000 pending -->
+          <div style="display:flex;flex-direction:column;align-items:center;flex:0 0 auto;width:60px">
+            <div class="chest-tip" data-tip="VIP 尊榮礼盒" style="width:38px;height:38px;border-radius:50%;background:rgba(30,30,50,.55);border:1.5px solid rgba(200,160,80,.5);box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 2px 8px rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center">
+              <img src="images/box/img_VIP_Box_1.png" style="width:26px;height:26px;object-fit:contain;filter:drop-shadow(0 1px 3px rgba(0,0,0,.3))">
+            </div>
+            <div style="font-size:10px;font-weight:600;color:#6b7280;margin-top:4px">$200,000</div>
+          </div>
+        </div>
+        <!-- Timer -->
+        <div style="display:flex;align-items:center;justify-content:center;gap:6px;padding-top:8px;border-top:1px solid rgba(99,102,241,.12);margin-top:4px">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="#6366f1"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+          <span style="color:#6366f1;font-size:11px;font-weight:600">重置倒數</span>
+          <span id="mg-timer" style="color:#e74c3c;font-size:12px;font-weight:700">10天 08:00:00</span>
+        </div>
+      </div>
+      </div><!-- /mgWrapper -->
+    </div>
+
+    <!-- BANNER CAROUSEL -->
+    <div class="relative overflow-hidden rounded-xl" style="height:260px" id="banner">
+      <!-- Slide 0 -->
+      <div class="slide absolute inset-0" style="opacity:1" id="slide-0">
+        <img src="images/banner/banner1.jpg" alt="banner1"
+             style="width:100%;height:100%;object-fit:cover;object-position:center;display:block;pointer-events:none;user-select:none">
+      </div>
+      <!-- Slide 1 -->
+      <div class="slide absolute inset-0" style="opacity:0;pointer-events:none" id="slide-1">
+        <img src="images/banner/banner2.jpg" alt="banner2"
+             style="width:100%;height:100%;object-fit:cover;object-position:center;display:block;pointer-events:none;user-select:none">
+      </div>
+      <!-- Dots -->
+      <div class="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2" id="dots">
+        <button onclick="goSlide(0)" class="w-2 h-2 rounded-full dot-active" id="dot-0"></button>
+        <button onclick="goSlide(1)" class="w-2 h-2 rounded-full dot-inactive" id="dot-1"></button>
+      </div>
+    </div>
+
+    <!-- FLASH SALE -->
+    <div id="flash-sale" class="mt-5 mb-2">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-1.5">
+          <span class="text-lg font-bold" style="
+            display:inline-block;
+            position:relative;
+            color:#fff;
+            font-size:18px;
+            font-weight:800;
+            letter-spacing:0.08em;
+            padding:5px 20px 5px 14px;
+            background:linear-gradient(90deg,#ef4444,#dc2626);
+            border-radius:4px 0 0 4px;
+            box-shadow:2px 3px 0 #991b1b,3px 5px 10px rgba(220,38,38,.35),inset 0 1px 0 rgba(255,255,255,.3);
+            clip-path:polygon(0 0,calc(100% - 12px) 0,100% 50%,calc(100% - 12px) 100%,0 100%);
+            text-shadow:0 1px 3px rgba(0,0,0,.3)
+          ">限時搶購</span>
+        </div>
+        <button class="text-red-500 text-sm font-medium hover:underline"></button>
+      </div>
+
+      <div class="grid grid-cols-3 gap-3">
+        <!-- Product 1 – click card for detail, click price for quick-add -->
+        <div class="bg-white rounded-xl p-4 border border-pink-100 flex flex-col items-center gap-1 hover:shadow-md cursor-pointer"
+             onclick="openProduct({id:1,emoji:'🪙',name:'海量 i 幣箱',price:10,origPrice:30,desc:'購買後可獲得大量 i 幣，可用於遊戲道具兌換。',tag:'限時',qty:99,limit:0})">
+          <img src="images/金幣.png" alt="海量 i 幣箱" draggable="false" style="width:72px;height:72px;object-fit:contain;display:block">
+          <div class="text-sm text-gray-700 text-center font-medium mt-1">海量 i 幣箱</div>
+          <div class="text-center" style="font-size:11px;color:#9ca3af;text-decoration:line-through;margin-bottom:2px">NT$30</div>
+          <button onclick="event.stopPropagation();addToCart({id:1,emoji:'🪙',name:'海量 i 幣箱',price:10,origPrice:30,limit:0})"
+            class="w-full text-xs font-bold text-white rounded-full flex items-center justify-center gap-1 hover:opacity-90" style="background:#c0392b">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5H3V3H1v2h2l3.6 7.59L5.25 15C5.09 15.31 5 15.65 5 16c0 1.1.9 2 2 2h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03L23 7H5.2z"/></svg>
+            NT$ 10
+          </button>
+          <div class="text-gray-400 text-xs" id="timer-0">22:42:45</div>
+        </div>
+        <!-- Product 2 -->
+        <div class="bg-white rounded-xl p-4 border border-pink-100 flex flex-col items-center gap-1 hover:shadow-md cursor-pointer"
+             onclick="openProduct({id:2,emoji:'🍀',name:'穀雨祈福組合包',price:199,origPrice:250,desc:'春季限定祈福禮包，內含多種稀有道具。',tag:'熱賣',qty:50,limit:0})">
+          <span class="text-4xl">🍀</span>
+          <div class="text-sm text-gray-700 text-center font-medium mt-1">穀雨祈福組合包</div>
+          <div class="text-center" style="font-size:11px;color:#9ca3af;text-decoration:line-through;margin-bottom:2px">NT$250</div>
+          <button onclick="event.stopPropagation();addToCart({id:2,emoji:'🍀',name:'穀雨祈福組合包',price:199,origPrice:250,limit:0})"
+            class="w-full text-xs font-bold text-white rounded-full flex items-center justify-center gap-1 hover:opacity-90" style="background:#c0392b">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5H3V3H1v2h2l3.6 7.59L5.25 15C5.09 15.31 5 15.65 5 16c0 1.1.9 2 2 2h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03L23 7H5.2z"/></svg>
+            NT$ 199
+          </button>
+          <div class="text-gray-400 text-xs" id="timer-1">23:43:45</div>
+        </div>
+        <!-- Product 3 – sold out (limit reached) -->
+        <div class="bg-white rounded-xl p-4 border border-pink-100 flex flex-col items-center gap-1 hover:shadow-md cursor-pointer"
+             onclick="openProduct({id:3,emoji:'📦',name:'英雄卡盒組',price:499,origPrice:600,desc:'稀有英雄卡片隨機組合包，限量發售。',tag:'限量',qty:0,limit:5})">
+          <div class="relative flex justify-center w-full">
+            <span class="text-4xl">📦</span>
+            <span class="absolute top-0 right-0 text-white rounded-full font-bold" style="font-size:24px;padding:6px 16px;background:#e74c3c;letter-spacing:0.04em">限量</span>
+          </div>
+          <div class="text-sm text-gray-700 text-center font-medium mt-1 w-full">英雄卡盒組</div>
+          <button disabled class="mt-0.5 text-xs font-bold text-gray-400 bg-gray-200 px-3 py-1 rounded-full cursor-not-allowed opacity-60 w-full text-center">已售完</button>
+          <div id="timer-2" style="color:#9ca3af;font-size:13px;font-family:'Courier New',Consolas,monospace;font-weight:700;letter-spacing:0.08em;margin-top:4px;animation:none;text-align:center;width:100%">—— 已結束 ——</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== TAB PRODUCT GRIDS ===== -->
+    <!-- TAB: 全部 -->
+    <div id="tab-content-all">
+    <div class="mt-8 pb-4">
+      <div class="grid grid-cols-3 gap-3">
+        <div class="bg-white rounded-xl border border-gray-100 p-3 flex flex-col items-center relative hover:shadow-md cursor-pointer"
+             onclick="openProduct({id:10,emoji:'💎',name:'60 鑽石',price:60,origPrice:60,desc:'購買後獲得 60 顆鑽石，可用於遊戲內各種購買。',tag:'',qty:99,limit:0})">
+          <span class="absolute top-2 left-2 text-white rounded font-medium" style="font-size:9px;background:#6b7280;padding:1px 5px">不可用券</span>
+          <div class="my-3"><svg width="44" height="44" viewBox="0 0 44 44"><polygon points="22,4 38,16 22,40 6,16" fill="#fce7f3" stroke="#ec4899" stroke-width="1.5"/><line x1="6" y1="16" x2="38" y2="16" stroke="#ec4899" stroke-width="1.5"/><polygon points="22,4 14,16 6,16" fill="#f9a8d4"/><polygon points="22,4 30,16 38,16" fill="#f472b6"/><polygon points="14,16 22,40 22,16" fill="#fbcfe8"/><polygon points="22,16 30,16 22,40" fill="#f9a8d4"/></svg></div>
+          <div class="text-xs text-gray-700 font-medium mb-2 text-center">60 鑽石</div>
+          <button onclick="event.stopPropagation();addToCart({id:10,emoji:'💎',name:'60 鑽石',price:60,origPrice:60,limit:0})"
+            class="w-full py-1.5 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1" style="background:#c0392b">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5H3V3H1v2h2l3.6 7.59L5.25 15C5.09 15.31 5 15.65 5 16c0 1.1.9 2 2 2h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03L23 7H5.2z"/></svg>
+            NT$ 60</button>
+        </div>
+
+        <!-- 180 鑽石 -->
+        <div class="bg-white rounded-xl border border-gray-100 p-3 flex flex-col items-center relative hover:shadow-md cursor-pointer"
+             onclick="openProduct({id:11,emoji:'💎',name:'180 鑽石',price:170,origPrice:170,desc:'購買後獲得 180 顆鑽石，可用於遊戲內各種購買。',tag:'',qty:99,limit:0})">
+          <span class="absolute top-2 left-2 text-white rounded font-medium" style="font-size:9px;background:#6b7280;padding:1px 5px">不可用券</span>
+          <div class="my-3"><svg width="44" height="44" viewBox="0 0 44 44"><polygon points="22,4 38,16 22,40 6,16" fill="#fce7f3" stroke="#ec4899" stroke-width="1.5"/><line x1="6" y1="16" x2="38" y2="16" stroke="#ec4899" stroke-width="1.5"/><polygon points="22,4 14,16 6,16" fill="#f9a8d4"/><polygon points="22,4 30,16 38,16" fill="#f472b6"/><polygon points="14,16 22,40 22,16" fill="#fbcfe8"/><polygon points="22,16 30,16 22,40" fill="#f9a8d4"/></svg></div>
+          <div class="text-xs text-gray-700 font-medium mb-2 text-center">180 鑽石</div>
+          <button onclick="event.stopPropagation();addToCart({id:11,emoji:'💎',name:'180 鑽石',price:170,origPrice:170,limit:0})"
+            class="w-full py-1.5 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1" style="background:#c0392b">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5H3V3H1v2h2l3.6 7.59L5.25 15C5.09 15.31 5 15.65 5 16c0 1.1.9 2 2 2h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03L23 7H5.2z"/></svg>
+            NT$ 170</button>
+        </div>
+
+        <!-- 330 鑽石 -->
+        <div class="bg-white rounded-xl border border-gray-100 p-3 flex flex-col items-center relative hover:shadow-md cursor-pointer"
+             onclick="openProduct({id:12,emoji:'💎',name:'330 鑽石',price:300,origPrice:300,desc:'購買後獲得 330 顆鑽石，可用於遊戲內各種購買。',tag:'',qty:99,limit:0})">
+          <span class="absolute top-2 left-2 text-white rounded font-medium" style="font-size:9px;background:#6b7280;padding:1px 5px">不可用券</span>
+          <div class="my-3"><svg width="44" height="44" viewBox="0 0 44 44"><polygon points="22,4 38,16 22,40 6,16" fill="#fce7f3" stroke="#ec4899" stroke-width="1.5"/><line x1="6" y1="16" x2="38" y2="16" stroke="#ec4899" stroke-width="1.5"/><polygon points="22,4 14,16 6,16" fill="#f9a8d4"/><polygon points="22,4 30,16 38,16" fill="#f472b6"/><polygon points="14,16 22,40 22,16" fill="#fbcfe8"/><polygon points="22,16 30,16 22,40" fill="#f9a8d4"/></svg></div>
+          <div class="text-xs text-gray-700 font-medium mb-2 text-center">330 鑽石</div>
+          <button onclick="event.stopPropagation();addToCart({id:12,emoji:'💎',name:'330 鑽石',price:300,origPrice:300,limit:0})"
+            class="w-full py-1.5 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1" style="background:#c0392b">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5H3V3H1v2h2l3.6 7.59L5.25 15C5.09 15.31 5 15.65 5 16c0 1.1.9 2 2 2h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03L23 7H5.2z"/></svg>
+            NT$ 300</button>
+        </div>
+
+        <!-- 700 鑽石 -->
+        <div class="bg-white rounded-xl border border-gray-100 p-3 flex flex-col items-center relative hover:shadow-md cursor-pointer"
+             onclick="openProduct({id:13,emoji:'💎',name:'700 鑽石',price:600,origPrice:600,desc:'購買後獲得 700 顆鑽石，可用於遊戲內各種購買。',tag:'',qty:99,limit:0})">
+          <span class="absolute top-2 left-2 text-white rounded font-medium" style="font-size:9px;background:#6b7280;padding:1px 5px">不可用券</span>
+          <div class="my-3"><svg width="44" height="44" viewBox="0 0 44 44"><polygon points="22,4 38,16 22,40 6,16" fill="#fce7f3" stroke="#ec4899" stroke-width="1.5"/><line x1="6" y1="16" x2="38" y2="16" stroke="#ec4899" stroke-width="1.5"/><polygon points="22,4 14,16 6,16" fill="#f9a8d4"/><polygon points="22,4 30,16 38,16" fill="#f472b6"/><polygon points="14,16 22,40 22,16" fill="#fbcfe8"/><polygon points="22,16 30,16 22,40" fill="#f9a8d4"/></svg></div>
+          <div class="text-xs text-gray-700 font-medium mb-2 text-center">700 鑽石</div>
+          <button onclick="event.stopPropagation();addToCart({id:13,emoji:'💎',name:'700 鑽石',price:600,origPrice:600,limit:0})"
+            class="w-full py-1.5 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1" style="background:#c0392b">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5H3V3H1v2h2l3.6 7.59L5.25 15C5.09 15.31 5 15.65 5 16c0 1.1.9 2 2 2h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03L23 7H5.2z"/></svg>
+            NT$ 600</button>
+        </div>
+
+        <!-- 1500 鑽石 -->
+        <div class="bg-white rounded-xl border border-gray-100 p-3 flex flex-col items-center relative hover:shadow-md cursor-pointer"
+             onclick="openProduct({id:14,emoji:'💎',name:'1500 鑽石',price:1200,origPrice:1200,desc:'購買後獲得 1500 顆鑽石，大量儲備最划算！',tag:'',qty:99,limit:0})">
+          <span class="absolute top-2 left-2 text-white rounded font-medium" style="font-size:9px;background:#6b7280;padding:1px 5px">不可用券</span>
+          <div class="my-3"><svg width="44" height="44" viewBox="0 0 44 44"><polygon points="22,4 38,16 22,40 6,16" fill="#fce7f3" stroke="#ec4899" stroke-width="1.5"/><line x1="6" y1="16" x2="38" y2="16" stroke="#ec4899" stroke-width="1.5"/><polygon points="22,4 14,16 6,16" fill="#f9a8d4"/><polygon points="22,4 30,16 38,16" fill="#f472b6"/><polygon points="14,16 22,40 22,16" fill="#fbcfe8"/><polygon points="22,16 30,16 22,40" fill="#f9a8d4"/></svg></div>
+          <div class="text-xs text-gray-700 font-medium mb-2 text-center">1500 鑽石</div>
+          <button onclick="event.stopPropagation();addToCart({id:14,emoji:'💎',name:'1500 鑽石',price:1200,origPrice:1200,limit:0})"
+            class="w-full py-1.5 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1" style="background:#c0392b">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5H3V3H1v2h2l3.6 7.59L5.25 15C5.09 15.31 5 15.65 5 16c0 1.1.9 2 2 2h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03L23 7H5.2z"/></svg>
+            NT$ 1200</button>
+        </div>
+
+        <!-- 3500 鑽石 -->
+        <div class="bg-white rounded-xl border border-gray-100 p-3 flex flex-col items-center relative hover:shadow-md cursor-pointer"
+             onclick="openProduct({id:15,emoji:'💎',name:'3500 鑽石',price:2500,origPrice:2500,desc:'購買後獲得 3500 顆鑽石，超值首選！',tag:'',qty:99,limit:0})">
+          <span class="absolute top-2 left-2 text-white rounded font-medium" style="font-size:9px;background:#6b7280;padding:1px 5px">不可用券</span>
+          <div class="my-3"><svg width="44" height="44" viewBox="0 0 44 44"><polygon points="22,4 38,16 22,40 6,16" fill="#fce7f3" stroke="#ec4899" stroke-width="1.5"/><line x1="6" y1="16" x2="38" y2="16" stroke="#ec4899" stroke-width="1.5"/><polygon points="22,4 14,16 6,16" fill="#f9a8d4"/><polygon points="22,4 30,16 38,16" fill="#f472b6"/><polygon points="14,16 22,40 22,16" fill="#fbcfe8"/><polygon points="22,16 30,16 22,40" fill="#f9a8d4"/></svg></div>
+          <div class="text-xs text-gray-700 font-medium mb-2 text-center">3500 鑽石</div>
+          <button onclick="event.stopPropagation();addToCart({id:15,emoji:'💎',name:'3500 鑽石',price:2500,origPrice:2500,limit:0})"
+            class="w-full py-1.5 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1" style="background:#c0392b">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5H3V3H1v2h2l3.6 7.59L5.25 15C5.09 15.31 5 15.65 5 16c0 1.1.9 2 2 2h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03L23 7H5.2z"/></svg>
+            NT$ 2500</button>
+        </div>
+
+        <!-- 1萬 i 幣 -->
+        <div class="bg-white rounded-xl border border-gray-100 p-3 flex flex-col items-center relative hover:shadow-md cursor-pointer"
+             onclick="openProduct({id:16,emoji:'🪙',name:'1萬 i 幣',price:10,origPrice:10,desc:'購買後獲得 1 萬 i 幣，可用於遊戲道具兌換。',tag:'',qty:99,limit:0})">
+          <div class="my-3"><svg width="44" height="44" viewBox="0 0 44 44"><ellipse cx="22" cy="36" rx="13" ry="4" fill="#92400e"/><rect x="9" y="28" width="26" height="8" fill="#d97706"/><ellipse cx="22" cy="28" rx="13" ry="4" fill="#f59e0b"/><rect x="9" y="20" width="26" height="8" fill="#d97706"/><ellipse cx="22" cy="20" rx="13" ry="4" fill="#fbbf24"/><rect x="9" y="12" width="26" height="8" fill="#d97706"/><ellipse cx="22" cy="12" rx="13" ry="4" fill="#fcd34d"/></svg></div>
+          <div class="text-xs text-gray-700 font-medium mb-2 text-center">1萬 i 幣</div>
+          <button onclick="event.stopPropagation();addToCart({id:16,emoji:'🪙',name:'1萬 i 幣',price:10,origPrice:10,limit:0})"
+            class="w-full py-1.5 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1" style="background:#c0392b">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5H3V3H1v2h2l3.6 7.59L5.25 15C5.09 15.31 5 15.65 5 16c0 1.1.9 2 2 2h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03L23 7H5.2z"/></svg>
+            NT$ 10</button>
+        </div>
+
+        <!-- 5.5萬 i 幣 -->
+        <div class="bg-white rounded-xl border border-gray-100 p-3 flex flex-col items-center relative hover:shadow-md cursor-pointer"
+             onclick="openProduct({id:17,emoji:'🪙',name:'5.5萬 i 幣',price:50,origPrice:50,desc:'購買後獲得 5.5 萬 i 幣，大量儲備超划算！',tag:'',qty:99,limit:0})">
+          <div class="my-3"><svg width="44" height="44" viewBox="0 0 44 44"><ellipse cx="22" cy="36" rx="13" ry="4" fill="#92400e"/><rect x="9" y="28" width="26" height="8" fill="#d97706"/><ellipse cx="22" cy="28" rx="13" ry="4" fill="#f59e0b"/><rect x="9" y="20" width="26" height="8" fill="#d97706"/><ellipse cx="22" cy="20" rx="13" ry="4" fill="#fbbf24"/><rect x="9" y="12" width="26" height="8" fill="#d97706"/><ellipse cx="22" cy="12" rx="13" ry="4" fill="#fcd34d"/></svg></div>
+          <div class="text-xs text-gray-700 font-medium mb-2 text-center">5.5萬 i 幣</div>
+          <button onclick="event.stopPropagation();addToCart({id:17,emoji:'🪙',name:'5.5萬 i 幣',price:50,origPrice:50,limit:0})"
+            class="w-full py-1.5 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1" style="background:#c0392b">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5H3V3H1v2h2l3.6 7.59L5.25 15C5.09 15.31 5 15.65 5 16c0 1.1.9 2 2 2h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03L23 7H5.2z"/></svg>
+            NT$ 50</button>
+        </div>
+
+        <!-- 11.5萬 i 幣 -->
+        <div class="bg-white rounded-xl border border-gray-100 p-3 flex flex-col items-center relative hover:shadow-md cursor-pointer"
+             onclick="openProduct({id:18,emoji:'🪙',name:'11.5萬 i 幣',price:100,origPrice:100,desc:'購買後獲得 11.5 萬 i 幣，超值首選！',tag:'',qty:99,limit:0})">
+          <div class="my-3"><svg width="44" height="44" viewBox="0 0 44 44"><ellipse cx="22" cy="36" rx="13" ry="4" fill="#92400e"/><rect x="9" y="28" width="26" height="8" fill="#d97706"/><ellipse cx="22" cy="28" rx="13" ry="4" fill="#f59e0b"/><rect x="9" y="20" width="26" height="8" fill="#d97706"/><ellipse cx="22" cy="20" rx="13" ry="4" fill="#fbbf24"/><rect x="9" y="12" width="26" height="8" fill="#d97706"/><ellipse cx="22" cy="12" rx="13" ry="4" fill="#fcd34d"/></svg></div>
+          <div class="text-xs text-gray-700 font-medium mb-2 text-center">11.5萬 i 幣</div>
+          <button onclick="event.stopPropagation();addToCart({id:18,emoji:'🪙',name:'11.5萬 i 幣',price:100,origPrice:100,limit:0})"
+            class="w-full py-1.5 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1" style="background:#c0392b">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5H3V3H1v2h2l3.6 7.59L5.25 15C5.09 15.31 5 15.65 5 16c0 1.1.9 2 2 2h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03L23 7H5.2z"/></svg>
+            NT$ 100</button>
+        </div>
+
+        <!-- 60萬 i 幣 -->
+        <div class="bg-white rounded-xl border border-gray-100 p-3 flex flex-col items-center relative hover:shadow-md cursor-pointer"
+             onclick="openProduct({id:19,emoji:'🪙',name:'60萬 i 幣',price:500,origPrice:500,desc:'購買後獲得 60 萬 i 幣，海量儲備超划算！',tag:'',qty:99,limit:0})">
+          <div class="my-3"><svg width="44" height="44" viewBox="0 0 44 44"><ellipse cx="22" cy="36" rx="13" ry="4" fill="#92400e"/><rect x="9" y="28" width="26" height="8" fill="#d97706"/><ellipse cx="22" cy="28" rx="13" ry="4" fill="#f59e0b"/><rect x="9" y="20" width="26" height="8" fill="#d97706"/><ellipse cx="22" cy="20" rx="13" ry="4" fill="#fbbf24"/><rect x="9" y="12" width="26" height="8" fill="#d97706"/><ellipse cx="22" cy="12" rx="13" ry="4" fill="#fcd34d"/></svg></div>
+          <div class="text-xs text-gray-700 font-medium mb-2 text-center">60萬 i 幣</div>
+          <button onclick="event.stopPropagation();addToCart({id:19,emoji:'🪙',name:'60萬 i 幣',price:500,origPrice:500,limit:0})"
+            class="w-full py-1.5 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1" style="background:#c0392b">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5H3V3H1v2h2l3.6 7.59L5.25 15C5.09 15.31 5 15.65 5 16c0 1.1.9 2 2 2h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03L23 7H5.2z"/></svg>
+            NT$ 500</button>
+        </div>
+
+        <!-- 130萬 i 幣 -->
+        <div class="bg-white rounded-xl border border-gray-100 p-3 flex flex-col items-center relative hover:shadow-md cursor-pointer"
+             onclick="openProduct({id:20,emoji:'🪙',name:'130萬 i 幣',price:1000,origPrice:1000,desc:'購買後獲得 130 萬 i 幣，終極海量儲備！',tag:'',qty:99,limit:0})">
+          <div class="my-3"><svg width="44" height="44" viewBox="0 0 44 44"><ellipse cx="22" cy="36" rx="13" ry="4" fill="#92400e"/><rect x="9" y="28" width="26" height="8" fill="#d97706"/><ellipse cx="22" cy="28" rx="13" ry="4" fill="#f59e0b"/><rect x="9" y="20" width="26" height="8" fill="#d97706"/><ellipse cx="22" cy="20" rx="13" ry="4" fill="#fbbf24"/><rect x="9" y="12" width="26" height="8" fill="#d97706"/><ellipse cx="22" cy="12" rx="13" ry="4" fill="#fcd34d"/></svg></div>
+          <div class="text-xs text-gray-700 font-medium mb-2 text-center">130萬 i 幣</div>
+          <button onclick="event.stopPropagation();addToCart({id:20,emoji:'🪙',name:'130萬 i 幣',price:1000,origPrice:1000,limit:0})"
+            class="w-full py-1.5 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1" style="background:#c0392b">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5H3V3H1v2h2l3.6 7.59L5.25 15C5.09 15.31 5 15.65 5 16c0 1.1.9 2 2 2h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03L23 7H5.2z"/></svg>
+            NT$ 1000</button>
+        </div>
+
+        <!-- 每日 i 幣箱 -->
+        <div class="bg-white rounded-xl border border-gray-100 p-3 flex flex-col items-center relative hover:shadow-md cursor-pointer"
+             onclick="openProduct({id:21,emoji:'📦',name:'每日 i 幣箱',price:33,origPrice:33,desc:'每日限購一次，購買後獲得隨機數量 i 幣，天天買天天賺！',tag:'每日',qty:1,limit:1})">
+          <div class="my-3"><svg width="44" height="44" viewBox="0 0 44 44"><rect x="6" y="22" width="32" height="16" rx="2" fill="#d97706"/><rect x="4" y="14" width="36" height="10" rx="3" fill="#f59e0b"/><rect x="18" y="14" width="8" height="24" rx="1" fill="#ef4444" opacity="0.8"/><rect x="4" y="20" width="36" height="4" rx="1" fill="#ef4444" opacity="0.8"/><polygon points="22,10 24,15 29,15 25,18 27,23 22,20 17,23 19,18 15,15 20,15" fill="#fcd34d"/></svg></div>
+          <div class="text-xs text-gray-700 font-medium mb-2 text-center">每日 i 幣箱</div>
+          <button onclick="event.stopPropagation();addToCart({id:21,emoji:'📦',name:'每日 i 幣箱',price:33,origPrice:33,limit:1})"
+            class="w-full py-1.5 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1" style="background:#c0392b">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5H3V3H1v2h2l3.6 7.59L5.25 15C5.09 15.31 5 15.65 5 16c0 1.1.9 2 2 2h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03L23 7H5.2z"/></svg>
+            NT$ 33</button>
+        </div>
+
+        <!-- 幻影刺客套裝 -->
+        <div class="bg-white rounded-xl border border-gray-100 p-3 flex flex-col items-center relative hover:shadow-md cursor-pointer"
+             onclick="openProduct({id:23,emoji:'🥷',name:'幻影刺客套裝',price:880,origPrice:880,desc:'稀有外觀套裝，包含頭盔、衣甲、武器，讓角色與眾不同。',tag:'',qty:99,limit:0})">
+          <div class="my-3" style="padding:0;background:none;border:none;box-shadow:none"><img src="images/prop.png" alt="幻影刺客套裝" draggable="false" style="width:100%;max-height:200px;object-fit:contain;border-radius:8px;display:block"></div>
+          <div class="text-xs text-gray-700 font-medium mb-2 text-center">幻影刺客套裝</div>
+          <button onclick="event.stopPropagation();addToCart({id:23,emoji:'🥷',name:'幻影刺客套裝',price:880,origPrice:880,limit:0})"
+            class="w-full py-1.5 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1" style="background:#c0392b">
+            NT$ 880</button>
+        </div>
+
+      </div>
+    </div>
+    </div><!-- /tab-content-all -->
+
+    <!-- ===== TAB: 鑽石 ===== -->
+    <div id="tab-content-diamond" class="hidden">
+      <div class="grid grid-cols-4 gap-3">
+        <div class="bg-white rounded-xl border border-gray-100 p-3 flex flex-col items-center relative hover:shadow-md cursor-pointer"
+             onclick="openProduct({id:10,emoji:'💎',name:'60 鑽石',price:60,origPrice:60,desc:'購買後獲得 60 顆鑽石，可用於遊戲內各種購買。',tag:'',qty:99,limit:0})">
+          <span class="absolute top-2 left-2 text-white rounded font-medium" style="font-size:9px;background:#6b7280;padding:1px 5px">不可用券</span>
+          <div class="my-3"><svg width="44" height="44" viewBox="0 0 44 44"><polygon points="22,4 38,16 22,40 6,16" fill="#fce7f3" stroke="#ec4899" stroke-width="1.5"/><line x1="6" y1="16" x2="38" y2="16" stroke="#ec4899" stroke-width="1.5"/><polygon points="22,4 14,16 6,16" fill="#f9a8d4"/><polygon points="22,4 30,16 38,16" fill="#f472b6"/><polygon points="14,16 22,40 22,16" fill="#fbcfe8"/><polygon points="22,16 30,16 22,40" fill="#f9a8d4"/></svg></div>
+          <div class="text-xs text-gray-700 font-medium mb-2 text-center">60 鑽石</div>
+          <button onclick="event.stopPropagation();addToCart({id:10,emoji:'💎',name:'60 鑽石',price:60,origPrice:60,limit:0})" class="w-full py-1.5 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1" style="background:#c0392b">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5H3V3H1v2h2l3.6 7.59L5.25 15C5.09 15.31 5 15.65 5 16c0 1.1.9 2 2 2h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03L23 7H5.2z"/></svg>NT$ 60</button>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-100 p-3 flex flex-col items-center relative hover:shadow-md cursor-pointer"
+             onclick="openProduct({id:11,emoji:'💎',name:'180 鑽石',price:170,origPrice:170,desc:'購買後獲得 180 顆鑽石，可用於遊戲內各種購買。',tag:'',qty:99,limit:0})">
+          <span class="absolute top-2 left-2 text-white rounded font-medium" style="font-size:9px;background:#6b7280;padding:1px 5px">不可用券</span>
+          <div class="my-3"><svg width="44" height="44" viewBox="0 0 44 44"><polygon points="22,4 38,16 22,40 6,16" fill="#fce7f3" stroke="#ec4899" stroke-width="1.5"/><line x1="6" y1="16" x2="38" y2="16" stroke="#ec4899" stroke-width="1.5"/><polygon points="22,4 14,16 6,16" fill="#f9a8d4"/><polygon points="22,4 30,16 38,16" fill="#f472b6"/><polygon points="14,16 22,40 22,16" fill="#fbcfe8"/><polygon points="22,16 30,16 22,40" fill="#f9a8d4"/></svg></div>
+          <div class="text-xs text-gray-700 font-medium mb-2 text-center">180 鑽石</div>
+          <button onclick="event.stopPropagation();addToCart({id:11,emoji:'💎',name:'180 鑽石',price:170,origPrice:170,limit:0})" class="w-full py-1.5 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1" style="background:#c0392b">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5H3V3H1v2h2l3.6 7.59L5.25 15C5.09 15.31 5 15.65 5 16c0 1.1.9 2 2 2h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03L23 7H5.2z"/></svg>NT$ 170</button>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-100 p-3 flex flex-col items-center relative hover:shadow-md cursor-pointer"
+             onclick="openProduct({id:12,emoji:'💎',name:'330 鑽石',price:300,origPrice:300,desc:'購買後獲得 330 顆鑽石，可用於遊戲內各種購買。',tag:'',qty:99,limit:0})">
+          <span class="absolute top-2 left-2 text-white rounded font-medium" style="font-size:9px;background:#6b7280;padding:1px 5px">不可用券</span>
+          <div class="my-3"><svg width="44" height="44" viewBox="0 0 44 44"><polygon points="22,4 38,16 22,40 6,16" fill="#fce7f3" stroke="#ec4899" stroke-width="1.5"/><line x1="6" y1="16" x2="38" y2="16" stroke="#ec4899" stroke-width="1.5"/><polygon points="22,4 14,16 6,16" fill="#f9a8d4"/><polygon points="22,4 30,16 38,16" fill="#f472b6"/><polygon points="14,16 22,40 22,16" fill="#fbcfe8"/><polygon points="22,16 30,16 22,40" fill="#f9a8d4"/></svg></div>
+          <div class="text-xs text-gray-700 font-medium mb-2 text-center">330 鑽石</div>
+          <button onclick="event.stopPropagation();addToCart({id:12,emoji:'💎',name:'330 鑽石',price:300,origPrice:300,limit:0})" class="w-full py-1.5 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1" style="background:#c0392b">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5H3V3H1v2h2l3.6 7.59L5.25 15C5.09 15.31 5 15.65 5 16c0 1.1.9 2 2 2h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03L23 7H5.2z"/></svg>NT$ 300</button>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-100 p-3 flex flex-col items-center relative hover:shadow-md cursor-pointer"
+             onclick="openProduct({id:13,emoji:'💎',name:'700 鑽石',price:600,origPrice:600,desc:'購買後獲得 700 顆鑽石，可用於遊戲內各種購買。',tag:'',qty:99,limit:0})">
+          <span class="absolute top-2 left-2 text-white rounded font-medium" style="font-size:9px;background:#6b7280;padding:1px 5px">不可用券</span>
+          <div class="my-3"><svg width="44" height="44" viewBox="0 0 44 44"><polygon points="22,4 38,16 22,40 6,16" fill="#fce7f3" stroke="#ec4899" stroke-width="1.5"/><line x1="6" y1="16" x2="38" y2="16" stroke="#ec4899" stroke-width="1.5"/><polygon points="22,4 14,16 6,16" fill="#f9a8d4"/><polygon points="22,4 30,16 38,16" fill="#f472b6"/><polygon points="14,16 22,40 22,16" fill="#fbcfe8"/><polygon points="22,16 30,16 22,40" fill="#f9a8d4"/></svg></div>
+          <div class="text-xs text-gray-700 font-medium mb-2 text-center">700 鑽石</div>
+          <button onclick="event.stopPropagation();addToCart({id:13,emoji:'💎',name:'700 鑽石',price:600,origPrice:600,limit:0})" class="w-full py-1.5 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1" style="background:#c0392b">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5H3V3H1v2h2l3.6 7.59L5.25 15C5.09 15.31 5 15.65 5 16c0 1.1.9 2 2 2h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03L23 7H5.2z"/></svg>NT$ 600</button>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-100 p-3 flex flex-col items-center relative hover:shadow-md cursor-pointer"
+             onclick="openProduct({id:14,emoji:'💎',name:'1500 鑽石',price:1200,origPrice:1200,desc:'購買後獲得 1500 顆鑽石，大量儲備最划算！',tag:'',qty:99,limit:0})">
+          <span class="absolute top-2 left-2 text-white rounded font-medium" style="font-size:9px;background:#6b7280;padding:1px 5px">不可用券</span>
+          <div class="my-3"><svg width="44" height="44" viewBox="0 0 44 44"><polygon points="22,4 38,16 22,40 6,16" fill="#fce7f3" stroke="#ec4899" stroke-width="1.5"/><line x1="6" y1="16" x2="38" y2="16" stroke="#ec4899" stroke-width="1.5"/><polygon points="22,4 14,16 6,16" fill="#f9a8d4"/><polygon points="22,4 30,16 38,16" fill="#f472b6"/><polygon points="14,16 22,40 22,16" fill="#fbcfe8"/><polygon points="22,16 30,16 22,40" fill="#f9a8d4"/></svg></div>
+          <div class="text-xs text-gray-700 font-medium mb-2 text-center">1500 鑽石</div>
+          <button onclick="event.stopPropagation();addToCart({id:14,emoji:'💎',name:'1500 鑽石',price:1200,origPrice:1200,limit:0})" class="w-full py-1.5 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1" style="background:#c0392b">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5H3V3H1v2h2l3.6 7.59L5.25 15C5.09 15.31 5 15.65 5 16c0 1.1.9 2 2 2h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03L23 7H5.2z"/></svg>NT$ 1200</button>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-100 p-3 flex flex-col items-center relative hover:shadow-md cursor-pointer"
+             onclick="openProduct({id:15,emoji:'💎',name:'3500 鑽石',price:2500,origPrice:2500,desc:'購買後獲得 3500 顆鑽石，超值首選！',tag:'',qty:99,limit:0})">
+          <span class="absolute top-2 left-2 text-white rounded font-medium" style="font-size:9px;background:#6b7280;padding:1px 5px">不可用券</span>
+          <div class="my-3"><svg width="44" height="44" viewBox="0 0 44 44"><polygon points="22,4 38,16 22,40 6,16" fill="#fce7f3" stroke="#ec4899" stroke-width="1.5"/><line x1="6" y1="16" x2="38" y2="16" stroke="#ec4899" stroke-width="1.5"/><polygon points="22,4 14,16 6,16" fill="#f9a8d4"/><polygon points="22,4 30,16 38,16" fill="#f472b6"/><polygon points="14,16 22,40 22,16" fill="#fbcfe8"/><polygon points="22,16 30,16 22,40" fill="#f9a8d4"/></svg></div>
+          <div class="text-xs text-gray-700 font-medium mb-2 text-center">3500 鑽石</div>
+          <button onclick="event.stopPropagation();addToCart({id:15,emoji:'💎',name:'3500 鑽石',price:2500,origPrice:2500,limit:0})" class="w-full py-1.5 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1" style="background:#c0392b">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5H3V3H1v2h2l3.6 7.59L5.25 15C5.09 15.31 5 15.65 5 16c0 1.1.9 2 2 2h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03L23 7H5.2z"/></svg>NT$ 2500</button>
+        </div>
+      </div>
+    </div><!-- /tab-content-diamond -->
+
+    <!-- ===== TAB: i幣 ===== -->
+    <div id="tab-content-icoin" class="hidden">
+      <div class="grid grid-cols-4 gap-3">
+        <div class="bg-white rounded-xl border border-gray-100 p-3 flex flex-col items-center relative hover:shadow-md cursor-pointer"
+             onclick="openProduct({id:16,emoji:'🪙',name:'1萬 i 幣',price:10,origPrice:10,desc:'購買後獲得 1 萬 i 幣，可用於遊戲道具兌換。',tag:'',qty:99,limit:0})">
+          <div class="my-3"><svg width="44" height="44" viewBox="0 0 44 44"><ellipse cx="22" cy="36" rx="13" ry="4" fill="#92400e"/><rect x="9" y="28" width="26" height="8" fill="#d97706"/><ellipse cx="22" cy="28" rx="13" ry="4" fill="#f59e0b"/><rect x="9" y="20" width="26" height="8" fill="#d97706"/><ellipse cx="22" cy="20" rx="13" ry="4" fill="#fbbf24"/><rect x="9" y="12" width="26" height="8" fill="#d97706"/><ellipse cx="22" cy="12" rx="13" ry="4" fill="#fcd34d"/></svg></div>
+          <div class="text-xs text-gray-700 font-medium mb-2 text-center">1萬 i 幣</div>
+          <button onclick="event.stopPropagation();addToCart({id:16,emoji:'🪙',name:'1萬 i 幣',price:10,origPrice:10,limit:0})" class="w-full py-1.5 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1" style="background:#c0392b">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5H3V3H1v2h2l3.6 7.59L5.25 15C5.09 15.31 5 15.65 5 16c0 1.1.9 2 2 2h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03L23 7H5.2z"/></svg>NT$ 10</button>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-100 p-3 flex flex-col items-center relative hover:shadow-md cursor-pointer"
+             onclick="openProduct({id:17,emoji:'🪙',name:'5.5萬 i 幣',price:50,origPrice:50,desc:'購買後獲得 5.5 萬 i 幣，大量儲備超划算！',tag:'',qty:99,limit:0})">
+          <div class="my-3"><svg width="44" height="44" viewBox="0 0 44 44"><ellipse cx="22" cy="36" rx="13" ry="4" fill="#92400e"/><rect x="9" y="28" width="26" height="8" fill="#d97706"/><ellipse cx="22" cy="28" rx="13" ry="4" fill="#f59e0b"/><rect x="9" y="20" width="26" height="8" fill="#d97706"/><ellipse cx="22" cy="20" rx="13" ry="4" fill="#fbbf24"/><rect x="9" y="12" width="26" height="8" fill="#d97706"/><ellipse cx="22" cy="12" rx="13" ry="4" fill="#fcd34d"/></svg></div>
+          <div class="text-xs text-gray-700 font-medium mb-2 text-center">5.5萬 i 幣</div>
+          <button onclick="event.stopPropagation();addToCart({id:17,emoji:'🪙',name:'5.5萬 i 幣',price:50,origPrice:50,limit:0})" class="w-full py-1.5 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1" style="background:#c0392b">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5H3V3H1v2h2l3.6 7.59L5.25 15C5.09 15.31 5 15.65 5 16c0 1.1.9 2 2 2h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03L23 7H5.2z"/></svg>NT$ 50</button>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-100 p-3 flex flex-col items-center relative hover:shadow-md cursor-pointer"
+             onclick="openProduct({id:18,emoji:'🪙',name:'11.5萬 i 幣',price:100,origPrice:100,desc:'購買後獲得 11.5 萬 i 幣，超值首選！',tag:'',qty:99,limit:0})">
+          <div class="my-3"><svg width="44" height="44" viewBox="0 0 44 44"><ellipse cx="22" cy="36" rx="13" ry="4" fill="#92400e"/><rect x="9" y="28" width="26" height="8" fill="#d97706"/><ellipse cx="22" cy="28" rx="13" ry="4" fill="#f59e0b"/><rect x="9" y="20" width="26" height="8" fill="#d97706"/><ellipse cx="22" cy="20" rx="13" ry="4" fill="#fbbf24"/><rect x="9" y="12" width="26" height="8" fill="#d97706"/><ellipse cx="22" cy="12" rx="13" ry="4" fill="#fcd34d"/></svg></div>
+          <div class="text-xs text-gray-700 font-medium mb-2 text-center">11.5萬 i 幣</div>
+          <button onclick="event.stopPropagation();addToCart({id:18,emoji:'🪙',name:'11.5萬 i 幣',price:100,origPrice:100,limit:0})" class="w-full py-1.5 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1" style="background:#c0392b">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5H3V3H1v2h2l3.6 7.59L5.25 15C5.09 15.31 5 15.65 5 16c0 1.1.9 2 2 2h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03L23 7H5.2z"/></svg>NT$ 100</button>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-100 p-3 flex flex-col items-center relative hover:shadow-md cursor-pointer"
+             onclick="openProduct({id:19,emoji:'🪙',name:'60萬 i 幣',price:500,origPrice:500,desc:'購買後獲得 60 萬 i 幣，海量儲備超划算！',tag:'',qty:99,limit:0})">
+          <div class="my-3"><svg width="44" height="44" viewBox="0 0 44 44"><ellipse cx="22" cy="36" rx="13" ry="4" fill="#92400e"/><rect x="9" y="28" width="26" height="8" fill="#d97706"/><ellipse cx="22" cy="28" rx="13" ry="4" fill="#f59e0b"/><rect x="9" y="20" width="26" height="8" fill="#d97706"/><ellipse cx="22" cy="20" rx="13" ry="4" fill="#fbbf24"/><rect x="9" y="12" width="26" height="8" fill="#d97706"/><ellipse cx="22" cy="12" rx="13" ry="4" fill="#fcd34d"/></svg></div>
+          <div class="text-xs text-gray-700 font-medium mb-2 text-center">60萬 i 幣</div>
+          <button onclick="event.stopPropagation();addToCart({id:19,emoji:'🪙',name:'60萬 i 幣',price:500,origPrice:500,limit:0})" class="w-full py-1.5 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1" style="background:#c0392b">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5H3V3H1v2h2l3.6 7.59L5.25 15C5.09 15.31 5 15.65 5 16c0 1.1.9 2 2 2h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03L23 7H5.2z"/></svg>NT$ 500</button>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-100 p-3 flex flex-col items-center relative hover:shadow-md cursor-pointer"
+             onclick="openProduct({id:20,emoji:'🪙',name:'130萬 i 幣',price:1000,origPrice:1000,desc:'購買後獲得 130 萬 i 幣，終極海量儲備！',tag:'',qty:99,limit:0})">
+          <div class="my-3"><svg width="44" height="44" viewBox="0 0 44 44"><ellipse cx="22" cy="36" rx="13" ry="4" fill="#92400e"/><rect x="9" y="28" width="26" height="8" fill="#d97706"/><ellipse cx="22" cy="28" rx="13" ry="4" fill="#f59e0b"/><rect x="9" y="20" width="26" height="8" fill="#d97706"/><ellipse cx="22" cy="20" rx="13" ry="4" fill="#fbbf24"/><rect x="9" y="12" width="26" height="8" fill="#d97706"/><ellipse cx="22" cy="12" rx="13" ry="4" fill="#fcd34d"/></svg></div>
+          <div class="text-xs text-gray-700 font-medium mb-2 text-center">130萬 i 幣</div>
+          <button onclick="event.stopPropagation();addToCart({id:20,emoji:'🪙',name:'130萬 i 幣',price:1000,origPrice:1000,limit:0})" class="w-full py-1.5 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1" style="background:#c0392b">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5H3V3H1v2h2l3.6 7.59L5.25 15C5.09 15.31 5 15.65 5 16c0 1.1.9 2 2 2h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03L23 7H5.2z"/></svg>NT$ 1000</button>
+        </div>
+      </div>
+    </div><!-- /tab-content-icoin -->
+
+    <!-- ===== TAB: 道具與其它 ===== -->
+    <div id="tab-content-items" class="hidden">
+      <div class="grid grid-cols-4 gap-3">
+        <!-- 每日 i 幣箱 -->
+        <div class="bg-white rounded-xl border border-gray-100 p-3 flex flex-col items-center relative hover:shadow-md cursor-pointer"
+             onclick="openProduct({id:21,emoji:'📦',name:'每日 i 幣箱',price:33,origPrice:33,desc:'每日限購一次，購買後獲得隨機數量 i 幣，天天買天天賺！',tag:'每日',qty:1,limit:1})">
+          <div class="my-3"><svg width="44" height="44" viewBox="0 0 44 44"><rect x="6" y="22" width="32" height="16" rx="2" fill="#d97706"/><rect x="4" y="14" width="36" height="10" rx="3" fill="#f59e0b"/><rect x="18" y="14" width="8" height="24" rx="1" fill="#ef4444" opacity="0.8"/><rect x="4" y="20" width="36" height="4" rx="1" fill="#ef4444" opacity="0.8"/><polygon points="22,10 24,15 29,15 25,18 27,23 22,20 17,23 19,18 15,15 20,15" fill="#fcd34d"/></svg></div>
+          <div class="text-xs text-gray-700 font-medium mb-2 text-center">每日 i 幣箱</div>
+          <button onclick="event.stopPropagation();addToCart({id:21,emoji:'📦',name:'每日 i 幣箱',price:33,origPrice:33,limit:1})" class="w-full py-1.5 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1" style="background:#c0392b">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5H3V3H1v2h2l3.6 7.59L5.25 15C5.09 15.31 5 15.65 5 16c0 1.1.9 2 2 2h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03L23 7H5.2z"/></svg>NT$ 33</button>
+        </div>
+        <!-- 狂暴攻擊卡 -->
+        <div class="bg-white rounded-xl border border-gray-100 p-3 flex flex-col items-center relative hover:shadow-md cursor-pointer"
+             onclick="openProduct({id:22,emoji:'🔥',name:'狂暴攻擊卡',price:50,origPrice:50,desc:'使用後 30 分鐘內攻擊力提升 50%，限時強化道具。',tag:'',qty:99,limit:0})">
+          <div class="my-3" style="padding:0;background:none;border:none;box-shadow:none"><img src="images/技能卡.png" alt="狂暴攻擊卡" draggable="false" style="width:100%;max-height:200px;object-fit:contain;border-radius:8px;display:block"></div>
+          <div class="text-xs text-gray-700 font-medium mb-2 text-center">狂暴攻擊卡</div>
+          <button onclick="event.stopPropagation();addToCart({id:22,emoji:'🔥',name:'狂暴攻擊卡',price:50,origPrice:50,limit:0})" class="w-full py-1.5 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1" style="background:#c0392b">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5H3V3H1v2h2l3.6 7.59L5.25 15C5.09 15.31 5 15.65 5 16c0 1.1.9 2 2 2h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03L23 7H5.2z"/></svg>NT$ 50</button>
+        </div>
+        <!-- 幻影刺客套裝 -->
+        <div class="bg-white rounded-xl border border-gray-100 p-3 flex flex-col items-center relative hover:shadow-md cursor-pointer"
+             onclick="openProduct({id:23,emoji:'🥷',name:'幻影刺客套裝',price:880,origPrice:880,desc:'稀有外觀套裝，包含頭盔、衣甲、武器，讓角色與眾不同。',tag:'',qty:99,limit:0})">
+          <div class="my-3" style="padding:0;background:none;border:none;box-shadow:none"><img src="images/prop.png" alt="幻影刺客套裝" draggable="false" style="width:100%;max-height:200px;object-fit:contain;border-radius:8px;display:block"></div>
+          <div class="text-xs text-gray-700 font-medium mb-2 text-center">幻影刺客套裝</div>
+          <button onclick="event.stopPropagation();addToCart({id:23,emoji:'🥷',name:'幻影刺客套裝',price:880,origPrice:880,limit:0})" class="w-full py-1.5 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1" style="background:#c0392b">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5H3V3H1v2h2l3.6 7.59L5.25 15C5.09 15.31 5 15.65 5 16c0 1.1.9 2 2 2h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03L23 7H5.2z"/></svg>NT$ 880</button>
+        </div>
+      </div>
+    </div><!-- /tab-content-items -->
+
+  <!-- ===== MOBILE ADD-ON SECTION (portrait only) ===== -->
+  <div id="mobileAddon" style="display:none;margin-top:20px">
+    <!-- Header (no overflow:hidden on parent so scroll works) -->
+    <div style="background:linear-gradient(135deg,#1845c8,#7c3aed);padding:12px 16px;display:flex;align-items:center;gap:8px;border-radius:14px 14px 0 0;box-shadow:0 -2px 0 0 rgba(99,102,241,.25)">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="#fde047" style="filter:drop-shadow(0 1px 3px rgba(0,0,0,.3))"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+      <div>
+        <div style="color:#fff;font-size:15px;font-weight:800;text-shadow:0 1px 4px rgba(0,0,0,.25)">超值加購區</div>
+        <div style="color:rgba(255,255,255,.75);font-size:12px;margin-top:1px">搭配買更划算</div>
+      </div>
+    </div>
+    <!-- Items: horizontal scroll — NO overflow:hidden on any ancestor -->
+    <div style="background:linear-gradient(160deg,#eef2ff,#f5f3ff);border-radius:0 0 14px 14px;border:1.5px solid rgba(99,102,241,.25);border-top:none;box-shadow:0 4px 12px rgba(99,102,241,.3)">
+      <div id="addonScroll" style="padding:12px 12px 14px;display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none">
+        <style>#addonScroll::-webkit-scrollbar{display:none}</style>
+        <!-- Item 1 新春紅包 -->
+        <div style="flex:0 0 auto;width:150px;border-radius:12px;overflow:hidden;background:linear-gradient(160deg,rgba(255,255,255,.97),rgba(235,240,255,.93));border:1.5px solid rgba(255,255,255,.85);box-shadow:0 4px 0 rgba(99,102,241,.15),0 6px 16px rgba(79,70,229,.12),inset 0 1.5px 0 rgba(255,255,255,.95)">
+          <div style="display:flex;align-items:center;gap:8px;padding:10px 10px 6px">
+            <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(145deg,#7c3aed,#4f46e5);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🧧</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;font-weight:700;color:#1e293b">新春紅包</div>
+              <div style="font-size:14px;font-weight:900;color:#dc2626">NT$ 30</div>
+            </div>
+          </div>
+          <div style="padding:0 10px 8px;display:flex;align-items:center;justify-content:space-between">
+            <div style="font-size:10px;color:#6366f1;font-weight:600">滿 $300 可加購</div>
+            <button onclick="addToCart({id:97,emoji:'🧧',name:'新春紅包',price:30,origPrice:30,limit:0})" style="width:28px;height:28px;border-radius:50%;background:linear-gradient(180deg,#fb923c,#ea580c);color:#fff;border:none;font-size:18px;font-weight:900;cursor:pointer;box-shadow:0 2px 0 #9a3412,inset 0 1px 0 rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center">+</button>
+          </div>
+        </div>
+        <!-- Item 2 精選禮包 -->
+        <div style="flex:0 0 auto;width:150px;border-radius:12px;overflow:hidden;background:linear-gradient(160deg,rgba(255,255,255,.97),rgba(235,240,255,.93));border:1.5px solid rgba(255,255,255,.85);box-shadow:0 4px 0 rgba(99,102,241,.15),0 6px 16px rgba(79,70,229,.12),inset 0 1.5px 0 rgba(255,255,255,.95)">
+          <div style="display:flex;align-items:center;gap:8px;padding:10px 10px 6px">
+            <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(145deg,#7c3aed,#4f46e5);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🎁</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;font-weight:700;color:#1e293b">精選禮包</div>
+              <div style="font-size:14px;font-weight:900;color:#dc2626">NT$ 80</div>
+            </div>
+          </div>
+          <div style="padding:0 10px 8px;display:flex;align-items:center;justify-content:space-between">
+            <div style="font-size:10px;color:#6366f1;font-weight:600">滿 $1000 可加購</div>
+            <button onclick="addToCart({id:98,emoji:'🎁',name:'精選禮包',price:80,origPrice:80,limit:0})" style="width:28px;height:28px;border-radius:50%;background:linear-gradient(180deg,#fb923c,#ea580c);color:#fff;border:none;font-size:18px;font-weight:900;cursor:pointer;box-shadow:0 2px 0 #9a3412,inset 0 1px 0 rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center">+</button>
+          </div>
+        </div>
+        <!-- Item 3 加倍驚喜包 (active) -->
+        <div style="flex:0 0 auto;width:150px;border-radius:12px;overflow:hidden;background:linear-gradient(160deg,rgba(255,255,255,.97),rgba(235,240,255,.93));border:2px solid rgba(99,102,241,.4);box-shadow:0 5px 0 rgba(99,102,241,.2),0 8px 20px rgba(79,70,229,.18),inset 0 1.5px 0 rgba(255,255,255,.95)">
+          <div style="background:linear-gradient(90deg,#ef4444,#dc2626);padding:3px 10px;text-align:center">
+            <span style="color:#fff;font-size:10px;font-weight:700;letter-spacing:.05em">✦ 現在可加購 ✦</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 10px 6px">
+            <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(145deg,#7c3aed,#4f46e5);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🎁</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;font-weight:700;color:#1e293b">加倍驚喜包</div>
+              <div style="font-size:14px;font-weight:900;color:#dc2626">NT$ 50</div>
+            </div>
+          </div>
+          <div style="padding:0 10px 8px;display:flex;align-items:center;justify-content:space-between">
+            <div style="font-size:10px;color:#6366f1;font-weight:600">滿 $500 可加購</div>
+            <button onclick="addToCart({id:99,emoji:'🎁',name:'加倍驚喜包',price:50,origPrice:50,limit:0})" style="width:28px;height:28px;border-radius:50%;background:linear-gradient(180deg,#4ade80,#16a34a);color:#fff;border:none;font-size:18px;font-weight:900;cursor:pointer;box-shadow:0 2px 0 #14532d,inset 0 1px 0 rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center">+</button>
+          </div>
+        </div>
+        <!-- Item 4 鑽石特惠包 -->
+        <div style="flex:0 0 auto;width:150px;border-radius:12px;overflow:hidden;background:linear-gradient(160deg,rgba(255,255,255,.97),rgba(235,240,255,.93));border:1.5px solid rgba(255,255,255,.85);box-shadow:0 4px 0 rgba(99,102,241,.15),0 6px 16px rgba(79,70,229,.12),inset 0 1.5px 0 rgba(255,255,255,.95)">
+          <div style="display:flex;align-items:center;gap:8px;padding:10px 10px 6px">
+            <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(145deg,#7c3aed,#4f46e5);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">💎</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;font-weight:700;color:#1e293b">鑽石特惠包</div>
+              <div style="font-size:14px;font-weight:900;color:#dc2626">NT$ 150</div>
+            </div>
+          </div>
+          <div style="padding:0 10px 8px;display:flex;align-items:center;justify-content:space-between">
+            <div style="font-size:10px;color:#6366f1;font-weight:600">滿 $3000 可加購</div>
+            <button onclick="addToCart({id:96,emoji:'💎',name:'鑽石特惠包',price:150,origPrice:150,limit:0})" style="width:28px;height:28px;border-radius:50%;background:linear-gradient(180deg,#fb923c,#ea580c);color:#fff;border:none;font-size:18px;font-weight:900;cursor:pointer;box-shadow:0 2px 0 #9a3412,inset 0 1px 0 rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center">+</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div><!-- /mobileAddon -->
+
+  </div><!-- /main -->
+
+  <!-- ===== RIGHT SIDEBAR ===== -->
+  <div id="right-sidebar" class="flex-shrink-0 border-l border-gray-100 overflow-hidden"
+       style="width:240px;height:calc(100vh - 112px);background:transparent;display:flex;flex-direction:column;gap:0">
+
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#1845c8,#7c3aed);padding:14px 16px 12px;flex-shrink:0">
+      <div class="flex items-center gap-2">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="#fde047" style="filter:drop-shadow(0 2px 4px rgba(0,0,0,.3))"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        <span style="color:#fff;font-size:17px;font-weight:800;text-shadow:0 1px 4px rgba(0,0,0,.25)">超值加購區</span>
+      </div>
+      <p style="color:rgba(255,255,255,.75);font-size:17px;margin:4px 0 0">搭配買更划算</p>
+    </div>
+
+    <!-- Items list -->
+    <div style="padding:12px 12px 190px;display:flex;flex-direction:column;gap:10px;flex:1;overflow-y:auto">
+
+      <!-- Item 1 -->
+      <div style="border-radius:14px;overflow:hidden;background:linear-gradient(160deg,rgba(255,255,255,.97),rgba(235,240,255,.93));border:1.5px solid rgba(255,255,255,.85);box-shadow:0 4px 0 rgba(99,102,241,.15),0 6px 16px rgba(79,70,229,.15),inset 0 1.5px 0 rgba(255,255,255,.95)">
+        <div style="display:flex;align-items:center;gap:10px;padding:11px 12px">
+          <div style="width:46px;height:46px;border-radius:12px;background:linear-gradient(145deg,#7c3aed,#4f46e5);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;box-shadow:0 3px 8px rgba(109,40,217,.3),inset 0 1px 0 rgba(255,255,255,.2)">🧧</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:700;color:#1e293b;line-height:1.2">新春紅包</div>
+            <div style="font-size:15px;font-weight:900;color:#dc2626;margin-top:2px">NT$ 30</div>
+          </div>
+          <button onclick="addToCart({id:97,emoji:'🧧',name:'新春紅包',price:30,origPrice:30,limit:0})"
+            style="width:34px;height:34px;border-radius:50%;background:linear-gradient(180deg,#fb923c,#ea580c);color:#fff;border:none;font-size:20px;font-weight:900;cursor:pointer;flex-shrink:0;box-shadow:0 2px 1px rgba(154,52,18,.5),0 3px 5px rgba(154,52,18,.25),0 6px 12px rgba(154,52,18,.12),inset 0 1px 0 rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;transition:transform .1s,box-shadow .1s"
+            onmousedown="this.style.transform='translateY(2px)';this.style.boxShadow='0 1px 1px rgba(154,52,18,.4),0 2px 3px rgba(154,52,18,.15)'"
+            onmouseup="this.style.transform='';this.style.boxShadow='0 2px 1px rgba(154,52,18,.5),0 3px 5px rgba(154,52,18,.25),0 6px 12px rgba(154,52,18,.12),inset 0 1px 0 rgba(255,255,255,.3)'"
+            onmouseleave="this.style.transform='';this.style.boxShadow='0 2px 1px rgba(154,52,18,.5),0 3px 5px rgba(154,52,18,.25),0 6px 12px rgba(154,52,18,.12),inset 0 1px 0 rgba(255,255,255,.3)'">+</button>
+        </div>
+        <div style="background:rgba(99,102,241,.08);padding:3px 12px;font-size:11px;color:#6366f1;font-weight:600">滿 $300 可加購</div>
+      </div>
+
+      <!-- Item 2 -->
+      <div style="border-radius:14px;overflow:hidden;background:linear-gradient(160deg,rgba(255,255,255,.97),rgba(235,240,255,.93));border:1.5px solid rgba(255,255,255,.85);box-shadow:0 4px 0 rgba(99,102,241,.15),0 6px 16px rgba(79,70,229,.15),inset 0 1.5px 0 rgba(255,255,255,.95)">
+        <div style="display:flex;align-items:center;gap:10px;padding:11px 12px">
+          <div style="width:46px;height:46px;border-radius:12px;background:linear-gradient(145deg,#7c3aed,#4f46e5);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;box-shadow:0 3px 8px rgba(109,40,217,.3),inset 0 1px 0 rgba(255,255,255,.2)">🎁</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:700;color:#1e293b;line-height:1.2">精選禮包</div>
+            <div style="font-size:15px;font-weight:900;color:#dc2626;margin-top:2px">NT$ 80</div>
+          </div>
+          <button onclick="addToCart({id:98,emoji:'🎁',name:'精選禮包',price:80,origPrice:80,limit:0})"
+            style="width:34px;height:34px;border-radius:50%;background:linear-gradient(180deg,#fb923c,#ea580c);color:#fff;border:none;font-size:20px;font-weight:900;cursor:pointer;flex-shrink:0;box-shadow:0 2px 1px rgba(154,52,18,.5),0 3px 5px rgba(154,52,18,.25),0 6px 12px rgba(154,52,18,.12),inset 0 1px 0 rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;transition:transform .1s,box-shadow .1s"
+            onmousedown="this.style.transform='translateY(2px)';this.style.boxShadow='0 1px 1px rgba(154,52,18,.4),0 2px 3px rgba(154,52,18,.15)'"
+            onmouseup="this.style.transform='';this.style.boxShadow='0 2px 1px rgba(154,52,18,.5),0 3px 5px rgba(154,52,18,.25),0 6px 12px rgba(154,52,18,.12),inset 0 1px 0 rgba(255,255,255,.3)'"
+            onmouseleave="this.style.transform='';this.style.boxShadow='0 2px 1px rgba(154,52,18,.5),0 3px 5px rgba(154,52,18,.25),0 6px 12px rgba(154,52,18,.12),inset 0 1px 0 rgba(255,255,255,.3)'">+</button>
+        </div>
+        <div style="background:rgba(99,102,241,.08);padding:3px 12px;font-size:11px;color:#6366f1;font-weight:600">滿 $1000 可加購</div>
+      </div>
+
+      <!-- Item featured (active) -->
+      <div style="border-radius:14px;overflow:hidden;background:linear-gradient(160deg,rgba(255,255,255,.97),rgba(235,240,255,.93));border:2px solid rgba(99,102,241,.35);box-shadow:0 5px 0 rgba(99,102,241,.2),0 8px 20px rgba(79,70,229,.2),inset 0 1.5px 0 rgba(255,255,255,.95)">
+        <!-- Active badge -->
+        <div style="background:linear-gradient(90deg,#ef4444,#dc2626);padding:4px 12px;text-align:center">
+          <span style="color:#fff;font-size:11px;font-weight:700;letter-spacing:0.06em">✦ 現在可加購 ✦</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:12px">
+          <div style="width:48px;height:48px;border-radius:12px;background:linear-gradient(145deg,#7c3aed,#4f46e5);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;box-shadow:0 3px 8px rgba(109,40,217,.35),inset 0 1px 0 rgba(255,255,255,.2)">🎁</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:700;color:#1e293b;line-height:1.2">加倍驚喜包</div>
+            <div style="font-size:17px;font-weight:900;color:#dc2626;margin-top:2px">NT$ 50</div>
+          </div>
+          <button onclick="addToCart({id:99,emoji:'🎁',name:'加倍驚喜包',price:50,origPrice:50,limit:0})"
+            style="width:36px;height:36px;border-radius:50%;background:linear-gradient(180deg,#4ade80,#16a34a);color:#fff;border:none;font-size:22px;font-weight:900;cursor:pointer;flex-shrink:0;box-shadow:0 2px 1px rgba(20,83,45,.5),0 3px 5px rgba(20,83,45,.25),0 6px 12px rgba(20,83,45,.12),inset 0 1px 0 rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;transition:transform .1s,box-shadow .1s"
+            onmousedown="this.style.transform='translateY(2px)';this.style.boxShadow='0 1px 1px rgba(20,83,45,.4),0 2px 3px rgba(20,83,45,.15)'"
+            onmouseup="this.style.transform='';this.style.boxShadow='0 2px 1px rgba(20,83,45,.5),0 3px 5px rgba(20,83,45,.25),0 6px 12px rgba(20,83,45,.12),inset 0 1px 0 rgba(255,255,255,.3)'"
+            onmouseleave="this.style.transform='';this.style.boxShadow='0 2px 1px rgba(20,83,45,.5),0 3px 5px rgba(20,83,45,.25),0 6px 12px rgba(20,83,45,.12),inset 0 1px 0 rgba(255,255,255,.3)'">+</button>
+        </div>
+        <div style="background:rgba(99,102,241,.08);padding:3px 12px;font-size:11px;color:#6366f1;font-weight:600">滿 $500 可加購</div>
+      </div>
+
+    </div>
+  </div><!-- /right sidebar -->
+</div><!-- /layout -->
+
+<!-- ===== LEFT FLOATING GIFT BAR ===== -->
+<div class="left-bar absolute z-50 flex items-center" id="leftBar" style="left:-210px;top:116px;bottom:16px">
+  <!-- Content panel -->
+  <div class="bg-white flex flex-col self-stretch" style="width:210px;border-radius:0 12px 12px 0;border:1.5px solid rgba(255,255,255,.88);border-left:none;border-right:1.5px solid rgba(180,180,220,.35);box-shadow:6px 0 0 rgba(99,102,241,.18),12px 0 0 rgba(99,102,241,.07),20px 0 40px rgba(79,70,229,.22),inset -2px 0 0 rgba(255,255,255,.9);background:linear-gradient(175deg,#eef2ff 0%,#f5f3ff 40%,#fdf4ff 100%) !important;overflow:hidden">
+    <!-- Header -->
+    <div class="flex items-center gap-2 px-4 pt-4 pb-3 flex-shrink-0" style="background:linear-gradient(135deg,#1845c8,#7c3aed);border-radius:0 12px 0 0">
+      <span style="font-size:20px;filter:drop-shadow(0 1px 3px rgba(0,0,0,.3))">🎁</span>
+      <span class="font-bold" style="color:#fff;font-size:20px;text-shadow:0 1px 4px rgba(0,0,0,.3)">滿額贈禮</span>
+    </div>
+    <!-- Accumulated amount -->
+    <div class="text-center px-3 py-3 mx-3 mt-3 mb-1 flex-shrink-0 rounded-xl" style="background:linear-gradient(135deg,rgba(255,220,100,.18),rgba(255,180,50,.12));border:1.5px solid rgba(234,179,8,.3);box-shadow:inset 0 1px 0 rgba(255,255,255,.8),0 2px 8px rgba(234,179,8,.12)">
+      <div class="text-xs mb-1" style="color:#92400e;font-size:14px;font-weight:600;letter-spacing:0.04em">本月已累積</div>
+      <div class="text-2xl font-extrabold" style="color:#dc2626;font-size:26px;text-shadow:0 1px 4px rgba(220,38,38,.2)">NT$ 30,000</div>
+    </div>
+    <!-- Milestone progress bar -->
+    <div class="relative flex-1 px-4 py-2">
+      <!-- Vertical line: completed (green) bottom portion -->
+      <div class="absolute" style="left:29px;top:24px;bottom:50%;width:3px;background:linear-gradient(to top,#22c55e,#86efac);border-radius:2px"></div>
+      <!-- Vertical line: pending (grey) top portion -->
+      <div class="absolute" style="left:29px;top:24px;bottom:50%;width:3px;background:linear-gradient(to bottom,#d1d5db,#e5e7eb);border-radius:2px;top:24px;bottom:calc(50% - 2px)"></div>
+      <div class="absolute" style="left:29px;top:24px;bottom:50%;width:3px;background:linear-gradient(to top,#22c55e 0%,#86efac 40%,#fb923c 58%,#d1d5db 80%);border-radius:2px;top:24px;bottom:24px"></div>
+      <!-- Milestone items -->
+      <div class="relative z-10 h-full flex flex-col justify-between">
+        <!-- $20萬 – pending (VIP) -->
+        <div class="flex items-center gap-2">
+          <div class="chest-tip w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" data-tip="VIP 尊榮禮盒" style="background:rgba(30,30,50,.55);border:1.5px solid rgba(200,160,80,.5);box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 2px 8px rgba(0,0,0,.2)">
+            <img src="images/box/img_VIP_Box_1.png" style="width:32px;height:32px;object-fit:contain;filter:drop-shadow(0 1px 3px rgba(0,0,0,.3))">
+          </div>
+          <span style="color:#6b7280;font-size:18px;font-weight:600">$200,000</span>
+        </div>
+        <!-- $15萬 – pending (rainbow) -->
+        <div class="flex items-center gap-2">
+          <div class="chest-tip w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" data-tip="彩虹砲彈禮盒" style="background:rgba(209,213,219,.45);border:1.5px solid rgba(209,213,219,.7);box-shadow:inset 0 1px 0 rgba(255,255,255,.6)">
+            <img src="images/box/img_Warhead_Box_1.png" style="width:30px;height:30px;object-fit:contain;opacity:.7;filter:drop-shadow(0 1px 3px rgba(0,0,0,.2))">
+          </div>
+          <span style="color:#6b7280;font-size:18px;font-weight:600">$150,000</span>
+        </div>
+        <!-- $8萬 – pending (purple) -->
+        <div class="flex items-center gap-2">
+          <div class="chest-tip w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" data-tip="紫色砲彈禮盒" style="background:rgba(209,213,219,.45);border:1.5px solid rgba(209,213,219,.7);box-shadow:inset 0 1px 0 rgba(255,255,255,.6)">
+            <img src="images/box/img_Warhead_Box_3.png" style="width:30px;height:30px;object-fit:contain;opacity:.7;filter:drop-shadow(0 1px 3px rgba(0,0,0,.2))">
+          </div>
+          <span style="color:#6b7280;font-size:18px;font-weight:600">$80,000</span>
+        </div>
+        <!-- $3萬 – current (orange, animated) -->
+        <div class="flex items-center gap-2">
+          <div id="gift-current" class="chest-tip w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0" data-tip="橙金砲彈禮盒" style="background:linear-gradient(135deg,#fed7aa,#fb923c);border:2px solid rgba(255,255,255,.8);box-shadow:0 0 0 3px rgba(234,88,12,.3),0 3px 10px rgba(234,88,12,.45)">
+            <img src="images/box/img_Warhead_Box_2.png" style="width:34px;height:34px;object-fit:contain;filter:drop-shadow(0 2px 4px rgba(0,0,0,.3))">
+          </div>
+          <div>
+            <div style="color:#ea580c;font-size:19px;font-weight:800;line-height:1.1">$30,000</div>
+            <div style="color:#f97316;font-size:11px;font-weight:600">▶ 目前階段</div>
+          </div>
+        </div>
+        <!-- $1萬 – completed (dark blue) -->
+        <div class="flex items-center gap-2">
+          <div class="chest-tip w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 relative" data-tip="魔法石禮盒 Ⅱ" style="background:linear-gradient(135deg,#bbf7d0,#4ade80);border:1.5px solid rgba(34,197,94,.4);box-shadow:0 2px 6px rgba(22,163,74,.3)">
+            <img src="images/box/img_MagicStone_Box_5.png" style="width:30px;height:30px;object-fit:contain;filter:drop-shadow(0 1px 3px rgba(0,0,0,.2))">
+            <span style="position:absolute;bottom:-2px;right:-2px;background:#16a34a;color:#fff;font-size:9px;font-weight:800;width:14px;height:14px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1.5px solid #fff">✓</span>
+          </div>
+          <span style="color:#16a34a;font-size:18px;font-weight:600;text-decoration:line-through;opacity:.8">$10,000</span>
+        </div>
+        <!-- $0 – completed (cyan) -->
+        <div class="flex items-center gap-2">
+          <div class="chest-tip w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 relative" data-tip="魔法石禮盒 Ⅰ" style="background:linear-gradient(135deg,#bbf7d0,#4ade80);border:1.5px solid rgba(34,197,94,.4);box-shadow:0 2px 6px rgba(22,163,74,.3)">
+            <img src="images/box/img_MagicStone_Box_4.png" style="width:30px;height:30px;object-fit:contain;filter:drop-shadow(0 1px 3px rgba(0,0,0,.2))">
+            <span style="position:absolute;bottom:-2px;right:-2px;background:#16a34a;color:#fff;font-size:9px;font-weight:800;width:14px;height:14px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1.5px solid #fff">✓</span>
+          </div>
+          <span style="color:#16a34a;font-size:18px;font-weight:600;text-decoration:line-through;opacity:.8">$0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reset countdown -->
+    <div class="px-4 pb-4 pt-3 flex-shrink-0 text-center" style="background:linear-gradient(135deg,rgba(99,102,241,.07),rgba(124,58,237,.05));border-top:1px solid rgba(99,102,241,.12)">
+      <div class="flex items-center justify-center gap-1 mb-1" style="color:#6366f1;font-size:12px;font-weight:600">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+        重置倒數
+      </div>
+      <div class="text-sm font-bold" id="leftbar-timer" style="color:#e74c3c">10天 08:00:00</div>
+    </div>
+  </div>
+  <!-- Tab handle -->
+  <button onclick="toggleLeftBar()" id="leftBarBtn"
+    class="select-none flex-shrink-0 flex flex-col items-center justify-center"
+    style="width:44px;height:130px;border-radius:0 16px 16px 0;background:linear-gradient(180deg,#4ade80,#16a34a,#15803d);color:#fff;font-weight:900;border:none;cursor:pointer;box-shadow:3px 0 1px rgba(20,83,45,.5),6px 0 5px rgba(20,83,45,.25),10px 0 16px rgba(20,83,45,.12),14px 0 24px rgba(22,163,74,.1),inset -2px 0 0 rgba(255,255,255,.35),inset 0 2px 0 rgba(255,255,255,.45);transition:transform .1s,box-shadow .1s"
+    onmousedown="this.style.transform='translateX(3px)';this.style.boxShadow='1px 0 0 #14532d,inset -2px 0 0 rgba(255,255,255,.25)'"
+    onmouseup="this.style.transform='';this.style.boxShadow='5px 0 0 #14532d,7px 0 0 rgba(20,83,45,.35),10px 0 24px rgba(22,163,74,.55),inset -2px 0 0 rgba(255,255,255,.35),inset 0 2px 0 rgba(255,255,255,.45)'"
+    onmouseleave="this.style.transform='';this.style.boxShadow='5px 0 0 #14532d,7px 0 0 rgba(20,83,45,.35),10px 0 24px rgba(22,163,74,.55),inset -2px 0 0 rgba(255,255,255,.35),inset 0 2px 0 rgba(255,255,255,.45)'">
+    <span id="leftBarArrow" style="font-size:28px;line-height:1;color:#fff">›</span>
+  </button>
+</div>
+
+<!-- ===== FLOATING CART ===== -->
+<button id="floatCart" onclick="openCartModal()"
+  class="absolute z-50 text-white flex flex-col items-center justify-center"
+  style="bottom:24px;right:24px;width:152px;height:152px;border-radius:50%;background:#dc2626;position:fixed">
+  <!-- 光澤高光弧 -->
+  <div class="fc-shine"></div>
+  <!-- 購物車圖示（加陰影深度） -->
+  <div style="filter:drop-shadow(0 3px 4px rgba(0,0,0,.35));line-height:1">
+    <svg width="54" height="54" viewBox="0 0 24 24" fill="white"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5H3V3H1v2h2l3.6 7.59L5.25 15C5.09 15.31 5 15.65 5 16c0 1.1.9 2 2 2h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03L23 7H5.2z"/></svg>
+  </div>
+  <!-- 文字 -->
+  <span class="fc-label" style="font-size:24px;font-weight:900;margin-top:5px;letter-spacing:0.08em;text-shadow:0 2px 4px rgba(0,0,0,.4)">結 帳</span>
+  <!-- 數字徽章 -->
+  <span id="cartBadge" class="hidden absolute" style="top:6px;right:6px;background:linear-gradient(135deg,#fde047,#f59e0b);color:#7c2d12;font-size:17px;font-weight:900;width:36px;height:36px;border-radius:50%;align-items:center;justify-content:center;border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3)">0</span>
+</button>
+
+</div><!-- /app-shell -->
+
+<!-- ===== ENTRY COUPON POPUP ===== -->
+<div id="couponPopup" class="modal-overlay">
+  <div class="relative" style="max-width:480px;width:calc(100% - 32px)">
+    <!-- Top badge -->
+    <div class="badge-anim absolute left-1/2 text-white text-sm font-bold px-5 py-1.5 rounded-full whitespace-nowrap z-10"
+         style="background:linear-gradient(135deg,#ef4444,#b91c1c);top:-16px;transform:translateX(-50%);box-shadow:0 3px 12px rgba(185,28,28,.5),inset 0 1px 0 rgba(255,255,255,.3)">🎫 您有未使用的優惠券！</div>
+    <!-- Modal box -->
+    <div style="border-radius:20px;overflow:hidden;background:linear-gradient(160deg,rgba(255,255,255,.98),rgba(235,240,255,.95));border:1.5px solid rgba(255,255,255,.88);border-bottom:1.5px solid rgba(180,180,220,.4);box-shadow:0 8px 0 rgba(99,102,241,.2),0 14px 0 rgba(99,102,241,.08),0 24px 50px rgba(79,70,229,.28),inset 0 2px 0 rgba(255,255,255,.95)">
+      <!-- Gradient header -->
+      <div style="background:linear-gradient(135deg,#1845c8,#7c3aed);padding:28px 24px 18px;text-align:center">
+        <svg width="52" height="34" viewBox="0 0 56 38" style="margin:0 auto 8px;display:block;filter:drop-shadow(0 2px 6px rgba(0,0,0,.3))">
+          <rect x="2" y="7" width="52" height="24" rx="5" fill="rgba(255,255,255,.35)"/>
+          <circle cx="2" cy="19" r="5" fill="rgba(255,255,255,.55)"/>
+          <circle cx="54" cy="19" r="5" fill="rgba(255,255,255,.55)"/>
+          <line x1="17" y1="7" x2="17" y2="31" stroke="white" stroke-width="1.5" stroke-dasharray="3 2"/>
+        </svg>
+        <h3 style="color:#fff;font-size:20px;font-weight:800;text-shadow:0 1px 4px rgba(0,0,0,.3);margin:0">專屬優惠提醒</h3>
+        <p style="color:rgba(255,255,255,.85);font-size:13px;margin:4px 0 0">以下優惠券即將到期，請盡快使用！</p>
+      </div>
+      <!-- Coupon list -->
+      <div style="padding:16px 16px 0">
+        <div style="border-radius:14px;overflow:hidden;margin-bottom:10px;background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1.5px solid rgba(245,158,11,.35);box-shadow:0 2px 8px rgba(245,158,11,.12),inset 0 1px 0 rgba(255,255,255,.8)">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px">
+            <div>
+              <div style="font-size:15px;font-weight:700;color:#1e293b">新手見面禮 (-$50)</div>
+              <div style="font-size:12px;color:#92400e;margin-top:2px">剩餘時間：<span id="cpn-timer-0">2天 23:58:26</span></div>
+            </div>
+            <span style="background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px;white-space:nowrap;margin-left:10px;box-shadow:0 2px 6px rgba(220,38,38,.35)">剩餘 1 張</span>
+          </div>
+        </div>
+        <div style="border-radius:14px;overflow:hidden;margin-bottom:10px;background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1.5px solid rgba(245,158,11,.35);box-shadow:0 2px 8px rgba(245,158,11,.12),inset 0 1px 0 rgba(255,255,255,.8)">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px">
+            <div>
+              <div style="font-size:15px;font-weight:700;color:#1e293b">尊榮 VIP 95折</div>
+              <div style="font-size:12px;color:#92400e;margin-top:2px">剩餘時間：<span id="cpn-timer-1">29天 23:58:26</span></div>
+            </div>
+            <span style="background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px;white-space:nowrap;margin-left:10px;box-shadow:0 2px 6px rgba(220,38,38,.35)">剩餘 3 張</span>
+          </div>
+        </div>
+        <div style="border-radius:14px;overflow:hidden;margin-bottom:16px;background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1.5px solid rgba(245,158,11,.35);box-shadow:0 2px 8px rgba(245,158,11,.12),inset 0 1px 0 rgba(255,255,255,.8)">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px">
+            <div>
+              <div style="font-size:15px;font-weight:700;color:#1e293b">週末大放送 (-$100)</div>
+              <div style="font-size:12px;color:#92400e;margin-top:2px">剩餘時間：<span id="cpn-timer-2">1天 23:58:26</span></div>
+            </div>
+            <span style="background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px;white-space:nowrap;margin-left:10px;box-shadow:0 2px 6px rgba(220,38,38,.35)">剩餘 2 張</span>
+          </div>
+        </div>
+      </div>
+      <!-- Button -->
+      <div style="padding:0 16px 20px">
+        <button onclick="closeCouponPopup()" style="width:100%;padding:15px;border-radius:14px;background:linear-gradient(180deg,#fb923c,#ea580c);color:#fff;border:none;font-size:17px;font-weight:700;cursor:pointer;letter-spacing:1px;box-shadow:0 3px 1px rgba(154,52,18,.5),0 5px 6px rgba(154,52,18,.25),0 8px 16px rgba(154,52,18,.12),0 12px 24px rgba(154,52,18,.07),inset 0 1.5px 0 rgba(255,255,255,.35);transition:transform .1s,box-shadow .1s" onmousedown="this.style.transform='translateY(4px)';this.style.boxShadow='0 1px 1px rgba(154,52,18,.4),0 2px 5px rgba(154,52,18,.15),inset 0 1.5px 0 rgba(255,255,255,.25)'" onmouseup="this.style.transform='';this.style.boxShadow='0 3px 1px rgba(154,52,18,.5),0 5px 6px rgba(154,52,18,.25),0 8px 16px rgba(154,52,18,.12),0 12px 24px rgba(154,52,18,.07),inset 0 1.5px 0 rgba(255,255,255,.35)'" onmouseleave="this.style.transform='';this.style.boxShadow='0 3px 1px rgba(154,52,18,.5),0 5px 6px rgba(154,52,18,.25),0 8px 16px rgba(154,52,18,.12),0 12px 24px rgba(154,52,18,.07),inset 0 1.5px 0 rgba(255,255,255,.35)'">✓ 我知道了，立即去逛！</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PRODUCT DETAIL MODAL ===== -->
+<div id="productModal" class="modal-overlay hidden">
+  <div class="modal-box" style="max-width:420px">
+    <div id="productModalBody"></div>
+  </div>
+</div>
+
+<!-- ===== CART CHECKOUT MODAL ===== -->
+<div id="cartModal" class="modal-overlay hidden" style="position:fixed;z-index:250;align-items:center">
+  <div style="background:linear-gradient(160deg,rgba(255,255,255,.98),rgba(235,240,255,.95));border-radius:20px;width:calc(100% - 32px);max-width:480px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;border:1.5px solid rgba(255,255,255,.88);border-bottom:1.5px solid rgba(180,180,220,.4);box-shadow:0 8px 0 rgba(99,102,241,.2),0 14px 0 rgba(99,102,241,.08),0 24px 50px rgba(79,70,229,.28),0 8px 20px rgba(0,0,0,.18),inset 0 2px 0 rgba(255,255,255,.95)">
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#1845c8,#0d2678);color:#fff;padding:18px 22px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:10px">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.2 5H3V3H1v2h2l3.6 7.59L5.25 15C5.09 15.31 5 15.65 5 16c0 1.1.9 2 2 2h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03L23 7H5.2z"/></svg>
+        <span style="font-size:20px;font-weight:700">購物車結算</span>
+      </div>
+      <button onclick="closeCartModal();tryClose()" style="background:rgba(255,255,255,.18);border:none;color:white;font-size:22px;cursor:pointer;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>
+    <!-- Scrollable body -->
+    <div style="flex:1;overflow-y:auto;padding:16px 20px 8px;scrollbar-width:none" id="cartModalBody"></div>
+    <style>#cartModalBody::-webkit-scrollbar{display:none}</style>
+  </div>
+</div>
+
+<!-- ===== COUPON PICKER MODAL ===== -->
+<div id="couponPickerModal" class="modal-overlay hidden" style="position:fixed;z-index:300;align-items:center">
+  <div style="background:linear-gradient(160deg,rgba(255,255,255,.98),rgba(235,240,255,.95));border-radius:20px;width:calc(100% - 32px);max-width:540px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;border:1.5px solid rgba(255,255,255,.88);box-shadow:0 8px 0 rgba(99,102,241,.18),0 14px 0 rgba(99,102,241,.07),0 20px 50px rgba(79,70,229,.25),inset 0 2px 0 rgba(255,255,255,.95)">
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#1845c8,#0d2678);color:#fff;padding:18px 22px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:10px">
+        <svg width="34" height="34" viewBox="0 0 56 38"><rect x="2" y="7" width="52" height="24" rx="5" fill="rgba(255,255,255,.55)"/><circle cx="2" cy="19" r="5" fill="rgba(255,255,255,.9)"/><circle cx="54" cy="19" r="5" fill="rgba(255,255,255,.9)"/><line x1="17" y1="7" x2="17" y2="31" stroke="white" stroke-width="2.5" stroke-dasharray="3 2"/></svg>
+        <span style="font-size:20px;font-weight:700">選擇優惠券</span>
+      </div>
+      <button onclick="closeCouponPicker()" style="background:rgba(255,255,255,.18);border:none;color:white;font-size:22px;cursor:pointer;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>
+    <!-- Coupon list -->
+    <div style="flex:1;overflow-y:auto;padding:16px 16px max(32px,env(safe-area-inset-bottom))" id="couponPickerBody"></div>
+  </div>
+</div>
+
+<!-- ===== EXIT RETENTION DIALOG ===== -->
+<div id="exitDialog" class="modal-overlay hidden">
+  <div style="max-width:480px;width:calc(100% - 32px);border-radius:24px;overflow:hidden;background:#fff;box-shadow:0 2px 0 rgba(99,102,241,.6),0 6px 0 rgba(79,70,229,.35),0 12px 0 rgba(79,70,229,.18),0 20px 0 rgba(79,70,229,.07),0 32px 60px rgba(79,70,229,.35),0 12px 28px rgba(0,0,0,.18)">
+    <!-- Header -->
+    <div style="background:linear-gradient(160deg,#2563eb 0%,#7c3aed 55%,#9333ea 100%);padding:32px 24px 26px;text-align:center;position:relative;overflow:hidden">
+      <!-- Inner highlight arc -->
+      <div style="position:absolute;top:-60px;left:50%;transform:translateX(-50%);width:340px;height:160px;border-radius:50%;background:rgba(255,255,255,.10);pointer-events:none"></div>
+      <!-- Subtle grain overlay -->
+      <div style="position:absolute;inset:0;background:repeating-linear-gradient(45deg,rgba(255,255,255,.03) 0px,rgba(255,255,255,.03) 1px,transparent 1px,transparent 6px);pointer-events:none"></div>
+      <!-- Decorative blobs -->
+      <div style="position:absolute;top:-28px;right:-28px;width:110px;height:110px;border-radius:50%;background:rgba(255,255,255,.08);pointer-events:none"></div>
+      <div style="position:absolute;bottom:-24px;left:-24px;width:86px;height:86px;border-radius:50%;background:rgba(255,255,255,.07);pointer-events:none"></div>
+      <!-- Emoji -->
+      <div style="display:inline-flex;align-items:center;justify-content:center;width:82px;height:82px;border-radius:50%;background:rgba(255,255,255,.15);margin-bottom:14px;box-shadow:0 4px 0 rgba(0,0,0,.18),0 8px 20px rgba(0,0,0,.22),inset 0 1.5px 0 rgba(255,255,255,.35)">
+        <span style="font-size:46px;line-height:1;filter:drop-shadow(0 3px 6px rgba(0,0,0,.3))" id="exitEmoji">😢</span>
+      </div>
+      <h3 style="color:#fff;font-size:22px;font-weight:900;text-shadow:0 2px 8px rgba(0,0,0,.3);margin:0;letter-spacing:.3px">真的要離開嗎…？</h3>
+    </div>
+    <!-- Bottom edge highlight (3D lip) -->
+    <div style="height:3px;background:linear-gradient(90deg,rgba(99,102,241,.0),rgba(99,102,241,.35),rgba(139,92,246,.35),rgba(99,102,241,.0))"></div>
+    <!-- Body -->
+    <div style="padding:22px 22px 24px;background:linear-gradient(180deg,#fafbff 0%,#fff 100%)">
+      <!-- Message box -->
+      <div style="background:linear-gradient(135deg,#f0f4ff,#e8eeff);border-radius:14px;padding:15px 18px;margin-bottom:20px;box-shadow:0 3px 0 rgba(99,102,241,.15),0 5px 14px rgba(99,102,241,.1),inset 0 1px 0 rgba(255,255,255,.95)">
+        <p style="font-size:15px;color:#374151;line-height:1.85;text-align:center;margin:0" id="exitMsg">您還沒有帶走任何商品耶，真的忍心離開嗎？</p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button onclick="closeExitDialog()" style="width:100%;padding:16px;border-radius:9999px;background:linear-gradient(180deg,#fb923c,#ea580c);color:#fff;border:none;font-size:17px;font-weight:800;cursor:pointer;letter-spacing:1px;box-shadow:0 3px 1px rgba(154,52,18,.5),0 5px 6px rgba(154,52,18,.25),0 8px 16px rgba(154,52,18,.12),0 12px 24px rgba(154,52,18,.07),inset 0 1.5px 0 rgba(255,255,255,.35);transition:transform .1s,box-shadow .1s;position:relative;top:0" onmousedown="this.style.transform='translateY(4px)';this.style.boxShadow='0 1px 1px rgba(154,52,18,.4),0 2px 5px rgba(154,52,18,.15),inset 0 1.5px 0 rgba(255,255,255,.25)'" onmouseup="this.style.transform='';this.style.boxShadow='0 3px 1px rgba(154,52,18,.5),0 5px 6px rgba(154,52,18,.25),0 8px 16px rgba(154,52,18,.12),0 12px 24px rgba(154,52,18,.07),inset 0 1.5px 0 rgba(255,255,255,.35)'" onmouseleave="this.style.transform='';this.style.boxShadow='0 3px 1px rgba(154,52,18,.5),0 5px 6px rgba(154,52,18,.25),0 8px 16px rgba(154,52,18,.12),0 12px 24px rgba(154,52,18,.07),inset 0 1.5px 0 rgba(255,255,255,.35)'">繼續逛逛</button>
+        <button onclick="forceClose()" style="width:100%;padding:16px;border-radius:9999px;background:linear-gradient(180deg,#e5e7eb,#d1d5db);color:#9ca3af;border:none;font-size:17px;font-weight:700;cursor:pointer;letter-spacing:1px;box-shadow:0 3px 1px rgba(156,163,175,.5),0 5px 6px rgba(156,163,175,.25),0 8px 16px rgba(156,163,175,.12),inset 0 1.5px 0 rgba(255,255,255,.6);transition:transform .1s,box-shadow .1s;position:relative;top:0" onmousedown="this.style.transform='translateY(4px)';this.style.boxShadow='0 1px 1px rgba(156,163,175,.4),0 2px 5px rgba(156,163,175,.15),inset 0 1.5px 0 rgba(255,255,255,.5)'" onmouseup="this.style.transform='';this.style.boxShadow='0 3px 1px rgba(156,163,175,.5),0 5px 6px rgba(156,163,175,.25),0 8px 16px rgba(156,163,175,.12),inset 0 1.5px 0 rgba(255,255,255,.6)'" onmouseleave="this.style.transform='';this.style.boxShadow='0 3px 1px rgba(156,163,175,.5),0 5px 6px rgba(156,163,175,.25),0 8px 16px rgba(156,163,175,.12),inset 0 1.5px 0 rgba(255,255,255,.6)'">無情離開</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PANEL (Orders / Coupons / Cart) ===== -->
+<div id="panelOverlay" class="panel-overlay hidden" onclick="closePanel()"></div>
+<div id="panelBox" class="panel-box hidden">
+  <div class="flex items-center justify-between px-5 py-4 flex-shrink-0" style="background:linear-gradient(135deg,#1845c8,#7c3aed)">
+    <h3 class="font-bold text-base" id="panelTitle" style="color:#fff;font-size:20px;text-shadow:0 1px 4px rgba(0,0,0,.25)">面板</h3>
+    <button onclick="closePanelOrExit()" style="width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.18);border:none;color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:700">╳</button>
+  </div>
+  <div class="flex-1 overflow-y-auto p-4" id="panelContent"></div>
+</div>
+
+<script>
+  // ── State ──
+  document.addEventListener('DOMContentLoaded', function() {
+    setTab('all');
+    // 商品圖片對應表 (product id → 圖片路徑)
+    const imgMap = {
+      1:  'images/金幣.png',
+      10: 'images/IMG_DEPOSIT_DIAMOND_10.png',
+      11: 'images/IMG_DEPOSIT_DIAMOND_11.png',
+      12: 'images/IMG_DEPOSIT_DIAMOND_12.png',
+      13: 'images/IMG_DEPOSIT_DIAMOND_13.png',
+      14: 'images/IMG_DEPOSIT_DIAMOND_14.png',
+      15: 'images/IMG_DEPOSIT_DIAMOND_15.png',
+      16: 'images/IMG_DEPOSIT_ICOIN_10.png',
+      17: 'images/IMG_DEPOSIT_ICOIN_11.png',
+      18: 'images/IMG_DEPOSIT_ICOIN_12.png',
+      19: 'images/IMG_DEPOSIT_ICOIN_13.png',
+      20: 'images/IMG_DEPOSIT_ICOIN_14.png',
+      21: 'images/IMG_DEPOSIT_ICOIN_15.png',
+      22: 'images/技能卡.png'
+    };
+    const diamondIds = new Set([10,11,12,13,14,15]);
+    const icoinIds   = new Set([1,16,17,18,19,20,21]);
+
+    // 小型 inline 圖示（放在名稱文字旁）
+    const diamondSVG = '<svg width="13" height="13" viewBox="0 0 56 56" style="flex-shrink:0"><polygon points="28,4 16,20 28,14" fill="#f5d0fe"/><polygon points="28,4 40,20 28,14" fill="#e879f9"/><polygon points="28,4 52,20 40,20" fill="#d946ef"/><polygon points="28,4 4,20 16,20" fill="#f0abfc"/><polygon points="4,20 16,20 28,52" fill="#a21caf"/><polygon points="16,20 28,14 28,52" fill="#c026d3"/><polygon points="28,14 40,20 28,52" fill="#d946ef"/><polygon points="40,20 52,20 28,52" fill="#86198f"/></svg>';
+    const icoinSVG   = '<svg width="13" height="13" viewBox="0 0 56 56" style="flex-shrink:0"><ellipse cx="28" cy="44" rx="17" ry="4.5" fill="#92400e"/><rect x="11" y="36" width="34" height="8" fill="#b45309"/><ellipse cx="28" cy="36" rx="17" ry="4.5" fill="#d97706"/><rect x="11" y="28" width="34" height="8" fill="#b45309"/><ellipse cx="28" cy="28" rx="17" ry="4.5" fill="#f59e0b"/><rect x="11" y="20" width="34" height="8" fill="#ca8a04"/><ellipse cx="28" cy="20" rx="17" ry="4.5" fill="#fbbf24"/></svg>';
+
+    // 格線商品卡（全部 / 鑽石 / i幣 / 道具）
+    document.querySelectorAll('#tab-content-all .bg-white, #tab-content-diamond .bg-white, #tab-content-icoin .bg-white, #tab-content-items .bg-white').forEach(function(card) {
+      var m = (card.getAttribute('onclick') || '').match(/id:(\d+)/);
+      if (!m) return;
+      var pid = parseInt(m[1]);
+      var src = imgMap[pid];
+      var iconArea = card.querySelector('.my-3');
+      if (iconArea && src) {
+        iconArea.style.padding = '0';
+        iconArea.style.background = 'none';
+        iconArea.style.border = 'none';
+        iconArea.style.boxShadow = 'none';
+        iconArea.innerHTML = '<img src="' + src + '" alt="" draggable="false" style="width:100%;max-height:200px;object-fit:contain;border-radius:8px;display:block">';
+      }
+      // 小圖示加入名稱文字旁
+      var nameEl = card.querySelector('.text-xs.font-medium, .text-xs.text-gray-700.font-medium');
+      if (nameEl && !nameEl.querySelector('svg')) {
+        var icon = diamondIds.has(pid) ? diamondSVG : (icoinIds.has(pid) ? icoinSVG : '');
+        if (icon) {
+          nameEl.style.display = 'flex';
+          nameEl.style.alignItems = 'center';
+          nameEl.style.justifyContent = 'center';
+          nameEl.style.gap = '3px';
+          nameEl.innerHTML = icon + nameEl.textContent.trim();
+        }
+      }
+    });
+
+    // 限時搶購卡（emoji span → img）
+    document.querySelectorAll('#flash-sale [onclick]').forEach(function(card) {
+      var m = (card.getAttribute('onclick') || '').match(/id:(\d+)/);
+      if (!m) return;
+      var pid = parseInt(m[1]);
+      var src = imgMap[pid];
+      if (!src) return;
+      var emojiEl = card.querySelector('.text-4xl');
+      if (emojiEl) {
+        var img = document.createElement('img');
+        img.src = src; img.alt = ''; img.draggable = false;
+        img.style.cssText = 'width:68px;height:68px;object-fit:contain;display:block;margin:0 auto';
+        emojiEl.replaceWith(img);
+      }
+    });
+  });
+  let pendingOrders = 1; // mock: 1筆未付款訂單
+  const cartItems = []; // 購物車區塊
+
+  // ── Ribbon labels map ──
+  const ribbonMap = {
+    12: {text:'9折'},
+    14: {text:'9折'},
+    17: {text:'85折'},
+    20: {text:'85折'},
+    21: {text:'限量'},
+    23: {text:'限量'},
+  };
+  const RIBBON_STYLE = 'position:absolute;top:10px;right:0;background:linear-gradient(90deg,#dc2626,#ef4444);color:#fff;font-size:28px;font-weight:900;padding:5px 14px 5px 20px;border-radius:0 4px 4px 0;box-shadow:-2px 3px 0 #991b1b,-3px 5px 10px rgba(220,38,38,.35),inset 0 1px 0 rgba(255,255,255,.3);clip-path:polygon(12px 0%,100% 0%,100% 100%,12px 100%,0% 50%);z-index:5;letter-spacing:.8px;pointer-events:none;line-height:1.5;text-shadow:0 1px 3px rgba(0,0,0,.25)';
+  function initRibbons() {
+    document.querySelectorAll('[onclick*="openProduct"]').forEach(function(el) {
+      var m = (el.getAttribute('onclick')||'').match(/id:(\d+)/);
+      if (!m) return;
+      var r = ribbonMap[parseInt(m[1])];
+      if (!r) return;
+      if (el.querySelector('.card-ribbon')) return;
+      // 確保父元素是 relative
+      var cur = el.style.position || window.getComputedStyle(el).position;
+      if (cur !== 'absolute' && cur !== 'fixed') el.style.position = 'relative';
+      var span = document.createElement('span');
+      span.className = 'card-ribbon';
+      span.textContent = r.text;
+      span.style.cssText = RIBBON_STYLE;
+      el.appendChild(span);
+    });
+  }
+  document.addEventListener('DOMContentLoaded', initRibbons);
+  let currentPanel = null;
+
+  // ── Tab switching ──
+  const tabIds = ['all', 'diamond', 'icoin', 'items'];
+  function setTab(id) {
+    tabIds.forEach(t => {
+      const el = document.getElementById('tab-' + t);
+      const content = document.getElementById('tab-content-' + t);
+      if (t === id) {
+        el.classList.add('tab-active');
+      } else {
+        el.classList.remove('tab-active');
+        if (content) content.classList.add('hidden');
+      }
+      if (content) {
+        if (t === id) content.classList.remove('hidden');
+        else content.classList.add('hidden');
+      }
+    });
+  }
+
+  // ── Banner Carousel ──
+  let currentSlide = 0;
+  const totalSlides = 2;
+  function goSlide(n) {
+    document.getElementById('slide-' + currentSlide).style.opacity = '0';
+    document.getElementById('slide-' + currentSlide).style.pointerEvents = 'none';
+    document.getElementById('dot-' + currentSlide).className = 'w-2 h-2 rounded-full dot-inactive';
+    currentSlide = n;
+    document.getElementById('slide-' + n).style.opacity = '1';
+    document.getElementById('slide-' + n).style.pointerEvents = 'auto';
+    document.getElementById('dot-' + n).className = 'w-2 h-2 rounded-full dot-active';
+  }
+  setInterval(() => goSlide((currentSlide + 1) % totalSlides), 4000);
+
+  // ── Countdown timers ──
+  const timers = [
+    { el: 'timer-0', secs: 81765 },
+    { el: 'timer-1', secs: 85425 },
+  ];
+  function fmt(s) {
+    return [Math.floor(s/3600), Math.floor((s%3600)/60), s%60]
+      .map(v => String(v).padStart(2,'0')).join(':');
+  }
+  setInterval(() => {
+    timers.forEach(t => {
+      if (t.secs > 0) t.secs--;
+      const el = document.getElementById(t.el);
+      if (el) el.textContent = fmt(t.secs);
+    });
+  }, 1000);
+
+  // ── Left bar toggle ──
+  let leftBarOpen = false;
+  function toggleLeftBar() {
+    if (window.innerWidth <= 960) return; // 手機尺寸不顯示
+    leftBarOpen = !leftBarOpen;
+    document.getElementById('leftBar').style.left = leftBarOpen ? '0px' : '-210px';
+    const arrow = document.getElementById('leftBarArrow');
+    if (arrow) arrow.textContent = leftBarOpen ? '‹' : '›';
+  }
+
+  // ── Leftbar reset countdown ──
+  let leftbarSecs = 10 * 86400 + 8 * 3600;
+  function fmtDayTime(s) {
+    const days = Math.floor(s / 86400);
+    const rest = s % 86400;
+    return days + '天 ' + [Math.floor(rest/3600), Math.floor((rest%3600)/60), rest%60].map(v => String(v).padStart(2,'0')).join(':');
+  }
+  setInterval(() => {
+    if (leftbarSecs > 0) leftbarSecs--;
+    const el = document.getElementById('leftbar-timer');
+    if (el) el.textContent = fmtDayTime(leftbarSecs);
+    const mg = document.getElementById('mg-timer');
+    if (mg) mg.textContent = fmtDayTime(leftbarSecs);
+  }, 1000);
+
+  function toggleMobileGifts() {
+    const exp = document.getElementById('mgExpanded');
+    const arrow = document.getElementById('mgArrow');
+    const open = exp.style.display === 'block';
+    exp.style.display = open ? 'none' : 'block';
+    arrow.style.transform = open ? '' : 'rotate(180deg)';
+  }
+
+  // ── Coupon popup timers ──
+  const cpnTimers = [
+    { id: 'cpn-timer-0', secs: 2 * 86400 + 23 * 3600 + 58 * 60 + 26 },
+    { id: 'cpn-timer-1', secs: 29 * 86400 + 23 * 3600 + 58 * 60 + 26 },
+    { id: 'cpn-timer-2', secs: 1 * 86400 + 23 * 3600 + 58 * 60 + 26 },
+  ];
+  setInterval(() => {
+    cpnTimers.forEach(t => {
+      if (t.secs > 0) t.secs--;
+      const el = document.getElementById(t.id);
+      if (el) el.textContent = fmtDayTime(t.secs);
+    });
+  }, 1000);
+
+  // ── Cart ──
+  function addToCart(product, qty = 1) {
+    const existing = cartItems.find(i => i.id === product.id);
+    if (existing) { existing.qty += qty; }
+    else { cartItems.push({...product, qty: qty}); }
+    updateCartBadge();
+    flashCart();
+    showToast('已加入購物車：' + product.name);
+  }
+  function updateCartBadge() {
+    const total = cartItems.reduce((s, i) => s + i.qty, 0);
+    const badge = document.getElementById('cartBadge');
+    badge.textContent = total;
+    const btn = document.getElementById('floatCart');
+    if (total > 0) {
+      badge.classList.remove('hidden'); badge.classList.add('flex');
+      btn.classList.add('cart-active');
+    } else {
+      badge.classList.add('hidden'); badge.classList.remove('flex');
+      btn.classList.remove('cart-active');
+    }
+  }
+  function flashCart() {
+    const btn = document.getElementById('floatCart');
+    btn.classList.remove('cart-flash');
+    void btn.offsetWidth;
+    btn.classList.add('cart-flash');
+  }
+
+  // ── Toast ──
+  let toastTimer;
+  function showToast(msg) {
+    let t = document.querySelector('.toast');
+    if (t) t.remove();
+    t = document.createElement('div');
+    t.className = 'toast';
+    t.textContent = msg;
+    document.getElementById('app-shell').appendChild(t);
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.remove(), 2200);
+  }
+
+  // ── Product modal ──
+  // ── Product modal state ──
+  let modalQty = 1;
+  let modalProduct = null;
+
+  function changeModalQty(delta) {
+    modalQty = Math.max(1, modalQty + delta);
+    const qtyEl = document.getElementById('modalQtyDisplay');
+    const priceEl = document.getElementById('modalTotalPrice');
+    if (qtyEl) qtyEl.textContent = modalQty;
+    if (priceEl) priceEl.textContent = 'NT$ ' + (modalProduct.price * modalQty);
+  }
+
+  function openProduct(p) {
+    modalProduct = p;
+    modalQty = 1;
+    const soldOut = p.limit > 0 && p.qty === 0;
+    document.getElementById('productModalBody').innerHTML = `
+      <!-- Header bar -->
+      <div style="background:linear-gradient(135deg,#1845c8,#7c3aed);padding:16px 20px 14px;border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:8px">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="white" opacity=".9"><path d="M20 6h-2.18c.07-.44.18-.88.18-1.33C18 2.54 15.75.5 13 .5S8 2.54 8 4.67c0 .45.11.89.18 1.33H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2zm-7-3.33c1.25 0 2.33.86 2.33 2C15.33 5.8 14.25 6.67 13 6.67S10.67 5.8 10.67 4.67c0-1.14 1.08-2 2.33-2zm7 19.33H6V8h2v2h2V8h6v2h2V8h2v14z"/></svg>
+          <span style="color:#fff;font-size:16px;font-weight:700;letter-spacing:.5px">商品詳情</span>
+        </div>
+        <button onclick="closeProductModal()" style="background:rgba(255,255,255,.18);border:none;color:white;font-size:18px;cursor:pointer;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;line-height:1;transition:background .2s" onmouseover="this.style.background='rgba(255,255,255,.32)'" onmouseout="this.style.background='rgba(255,255,255,.18)'">✕</button>
+      </div>
+
+      <!-- Product showcase -->
+      <div style="padding:20px 20px 0">
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
+          <!-- Image box -->
+          <div style="width:88px;height:88px;border-radius:16px;background:linear-gradient(145deg,#7c3aed,#6d28d9,#4f46e5);display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative;box-shadow:0 4px 12px rgba(99,102,241,.3)">
+            <span style="font-size:46px;line-height:1">${p.emoji}</span>
+            ${p.tag ? `<span style="position:absolute;top:-8px;right:-8px;background:linear-gradient(135deg,#ef4444,#b91c1c);color:#fff;font-size:10px;font-weight:800;padding:3px 8px;border-radius:20px;border:1.5px solid #fff;box-shadow:0 2px 6px rgba(185,28,28,.4);letter-spacing:.3px">${p.tag}</span>` : ''}
+          </div>
+          <!-- Info -->
+          <div style="flex:1;min-width:0">
+            <div style="font-size:24px;font-weight:800;color:#1e293b;margin-bottom:6px;line-height:1.3;display:flex;align-items:center;flex-wrap:wrap;gap:6px">
+              ${p.name}
+              ${ribbonMap[p.id] ? `<span style="font-size:14px;font-weight:800;padding:3px 12px;border-radius:9999px;color:#fff;background:linear-gradient(135deg,#ef4444,#b91c1c);box-shadow:0 2px 6px rgba(185,28,28,.4),inset 0 1px 0 rgba(255,255,255,.2);letter-spacing:.8px">${ribbonMap[p.id].text}</span>` : ''}
+            </div>
+            <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+              <span style="font-size:34px;font-weight:900;background:linear-gradient(135deg,#dc2626,#991b1b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text" id="modalTotalPrice">NT$ ${p.price}</span>
+              ${p.origPrice > p.price ? `<span style="font-size:14px;color:#94a3b8;text-decoration:line-through">NT$ ${p.origPrice}</span><span style="font-size:11px;font-weight:700;color:#dc2626;background:#fee2e2;padding:2px 6px;border-radius:8px">${Math.round((1-p.price/p.origPrice)*100)}% OFF</span>` : ''}
+            </div>
+            ${soldOut ? '<span style="display:inline-block;margin-top:6px;font-size:12px;background:#f1f5f9;color:#64748b;padding:3px 10px;border-radius:20px;font-weight:600">已售完</span>' :
+              p.limit > 0 ? `<span style="display:inline-block;margin-top:6px;font-size:12px;background:#fef2f2;color:#ef4444;padding:3px 10px;border-radius:20px;font-weight:600;border:1px solid #fecaca">限量 ${p.limit} 件</span>` : ''}
+          </div>
+        </div>
+
+        <!-- Divider -->
+        <div style="height:1px;background:linear-gradient(90deg,transparent,rgba(99,102,241,.15),transparent);margin-bottom:16px"></div>
+
+        ${p.desc ? `
+        <!-- Description -->
+        <div style="margin-bottom:16px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="#6366f1"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8v-2zm0-4h8v2H8v-2z"/></svg>
+            <span style="font-size:22px;font-weight:700;color:#6366f1;letter-spacing:.3px">商品說明</span>
+          </div>
+          <div style="background:linear-gradient(135deg,#f8faff,#f0f4ff);border:1px solid rgba(99,102,241,.12);border-radius:12px;padding:12px 14px;font-size:28px;color:#475569;line-height:1.7;max-height:120px;overflow:hidden;cursor:pointer;position:relative;word-break:break-all" id="descBox"
+               onclick="(function(el){
+                 if(el.style.maxHeight!='none'){el.style.maxHeight='none';document.getElementById('descCollapseRow').style.display='flex';}
+               })(this)">
+            ${p.desc}
+            <div style="position:absolute;bottom:0;left:0;right:0;height:28px;background:linear-gradient(transparent,#f0f4ff);border-radius:0 0 12px 12px" id="descFade"></div>
+          </div>
+          <div id="descCollapseRow" style="display:none;justify-content:center;margin-top:4px">
+            <button onclick="(function(){var b=document.getElementById('descBox');b.style.maxHeight='120px';document.getElementById('descCollapseRow').style.display='none';document.getElementById('descFade').style.display='block';})()" style="background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer;display:flex;align-items:center;gap:3px">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 14l5-5 5 5H7z"/></svg>收起
+            </button>
+          </div>
+          <div style="text-align:center;margin-top:4px" id="descExpandHint">
+            <span style="color:#94a3b8;font-size:22px;cursor:pointer" onclick="var b=document.getElementById('descBox');b.style.maxHeight='none';document.getElementById('descCollapseRow').style.display='flex';document.getElementById('descExpandHint').style.display='none';document.getElementById('descFade').style.display='none'">▼ 點此查看全部說明</span>
+          </div>
+        </div>` : ''}
+
+        ${!soldOut ? `
+        <!-- Qty stepper -->
+        <div style="display:flex;align-items:center;justify-content:center;gap:0;margin-bottom:20px;background:linear-gradient(135deg,#f8faff,#f0f4ff);border:1px solid rgba(99,102,241,.15);border-radius:16px;padding:10px 20px">
+          <button onclick="changeModalQty(-1)" style="width:44px;height:44px;border-radius:50%;background:#fff;border:1.5px solid #e2e8f0;font-size:22px;cursor:pointer;font-weight:700;color:#64748b;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.08);transition:all .15s" onmouseover="this.style.borderColor='#dc2626';this.style.color='#dc2626'" onmouseout="this.style.borderColor='#e2e8f0';this.style.color='#64748b'">－</button>
+          <span id="modalQtyDisplay" style="font-size:26px;font-weight:800;min-width:60px;text-align:center;color:#1e293b">1</span>
+          <button onclick="changeModalQty(1)" style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#ef4444,#dc2626);border:none;font-size:22px;cursor:pointer;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 10px rgba(220,38,38,.35);transition:transform .1s" onmousedown="this.style.transform='scale(.93)'" onmouseup="this.style.transform='scale(1)'">＋</button>
+        </div>` : ''}
+      </div>
+
+      <!-- Action buttons -->
+      <div style="padding:0 16px 16px;display:flex;gap:10px">
+        <button ${soldOut ? 'disabled' : `onclick="addToCart(modalProduct,modalQty);closeProductModal()"`}
+          style="flex:1;padding:13px 8px;border-radius:9999px;border:none;font-size:15px;font-weight:700;white-space:nowrap;cursor:${soldOut ? 'not-allowed' : 'pointer'};background:${soldOut ? 'linear-gradient(180deg,#d1d5db,#9ca3af)' : 'linear-gradient(180deg,#fb923c,#ea580c)'};color:#fff;box-shadow:${soldOut ? '0 2px 1px rgba(107,114,128,.4),0 4px 6px rgba(107,114,128,.2)' : '0 2px 1px rgba(154,52,18,.5),0 4px 5px rgba(154,52,18,.25),0 7px 14px rgba(154,52,18,.12)'};transition:transform .1s,box-shadow .1s;position:relative;top:0" ${soldOut ? '' : `onmousedown="this.style.transform='translateY(3px)';this.style.boxShadow='0 1px 1px rgba(154,52,18,.4),0 2px 3px rgba(154,52,18,.15)'" onmouseup="this.style.transform='';this.style.boxShadow='0 2px 1px rgba(154,52,18,.5),0 4px 5px rgba(154,52,18,.25),0 7px 14px rgba(154,52,18,.12)'"` }>
+          加入購物車</button>
+        <button ${soldOut ? 'disabled' : `onclick="addToCart(modalProduct,modalQty);openCartModal();closeProductModal()"`}
+          style="flex:1;padding:13px 8px;border-radius:9999px;border:none;font-size:15px;font-weight:700;white-space:nowrap;cursor:${soldOut ? 'not-allowed' : 'pointer'};background:${soldOut ? 'linear-gradient(180deg,#d1d5db,#9ca3af)' : 'linear-gradient(180deg,#ef4444,#dc2626)'};color:#fff;box-shadow:${soldOut ? '0 2px 1px rgba(107,114,128,.4),0 4px 6px rgba(107,114,128,.2)' : '0 2px 1px rgba(127,29,29,.5),0 4px 5px rgba(127,29,29,.25),0 7px 14px rgba(127,29,29,.12)'};letter-spacing:.5px;transition:transform .1s,box-shadow .1s;position:relative;top:0" ${soldOut ? '' : `onmousedown="this.style.transform='translateY(3px)';this.style.boxShadow='0 1px 1px rgba(127,29,29,.4),0 2px 3px rgba(127,29,29,.15)'" onmouseup="this.style.transform='';this.style.boxShadow='0 2px 1px rgba(127,29,29,.5),0 4px 5px rgba(127,29,29,.25),0 7px 14px rgba(127,29,29,.12)'"` }>
+          立即結帳</button>
+      </div>`;
+    document.getElementById('productModal').classList.remove('hidden');
+  }
+  function closeProductModal() {
+    document.getElementById('productModal').classList.add('hidden');
+  }
+
+  // ── Entry coupon popup ──
+  function closeCouponPopup() {
+    document.getElementById('couponPopup').classList.add('hidden');
+  }
+
+  // ── Exit dialog ──
+  function tryClose() {
+    const cartCount = cartItems.reduce((s, i) => s + i.qty, 0);
+    let emoji = '💔', msg = '';
+    if (cartCount > 0 && pendingOrders > 0) {
+      emoji = '🥹';
+      msg = `<span style="color:#1e3a8a;font-weight:700">您的購物車還有 <b>${cartCount}</b> 件商品，且有 <b>${pendingOrders}</b> 筆未付款訂單！</span><br><span style="color:#ea580c;font-weight:600">現在離開優惠可能就沒有了…別走，好嗎！</span>`;
+    } else if (cartCount > 0) {
+      emoji = '🥲';
+      msg = `<span style="color:#1e3a8a;font-weight:700">您的購物車還有 <b>${cartCount}</b> 件商品！</span><br><span style="color:#ea580c;font-weight:600">現在就是最佳結帳黃金時間！結帳吧！</span>`;
+    } else if (pendingOrders > 0) {
+      emoji = '😬';
+      msg = `<span style="color:#1e3a8a;font-weight:700">您還有 <b>${pendingOrders}</b> 筆未付款訂單！</span><br><span style="color:#ea580c;font-weight:600">現在就是最佳結帳黃金時間！快去付款吧！</span>`;
+    } else {
+      msg = '<span style="color:#374151">您還沒有帶走任何商品耶，真的忍心離開嗎？</span>';
+    }
+    document.getElementById('exitEmoji').textContent = emoji;
+    document.getElementById('exitMsg').innerHTML = msg;
+    document.getElementById('exitDialog').classList.remove('hidden');
+  }
+  function closeExitDialog() { document.getElementById('exitDialog').classList.add('hidden'); }
+  function forceClose() { closeExitDialog(); showToast('商城已關閉'); }
+
+  // ── Panels ──
+  const PANEL_DATA = {
+    order: {
+      title: '訂單記錄',
+      html: `
+        <div class="space-y-3">
+          <div class="border border-orange-200 rounded-xl p-3 bg-orange-50">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold text-orange-600 bg-orange-100 px-2 py-0.5 rounded-full">未付款</span>
+              <span class="text-xs text-gray-400">2026/04/20 14:32</span>
+            </div>
+            <div class="text-sm text-gray-700 mb-1">訂單 #ORD-20260420-001</div>
+            <div class="text-xs text-gray-500 mb-2">🍀 穀雨祈福組合包 × 1</div>
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-red-500">NT$ 199</span>
+              <button class="text-xs text-white px-3 py-1 rounded-full font-bold hover:opacity-90" style="background:#e74c3c">立即付款</button>
+            </div>
+          </div>
+          <div class="border border-gray-200 rounded-xl p-3">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">已完成</span>
+              <span class="text-xs text-gray-400">2026/04/18 09:15</span>
+            </div>
+            <div class="text-sm text-gray-700 mb-1">訂單 #ORD-20260418-005</div>
+            <div class="text-xs text-gray-500 mb-2">🪙 海量 i 幣箱 × 3</div>
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-gray-700">NT$ 30</span>
+              <span class="text-xs text-gray-400">已給獎</span>
+            </div>
+          </div>
+          <div class="border border-gray-200 rounded-xl p-3">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">已完成</span>
+              <span class="text-xs text-gray-400">2026/04/15 20:41</span>
+            </div>
+            <div class="text-sm text-gray-700 mb-1">訂單 #ORD-20260415-012</div>
+            <div class="text-xs text-gray-500 mb-2">🎁 加倍驚喜包 × 1</div>
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-gray-700">NT$ 50</span>
+              <span class="text-xs text-gray-400">已給獎</span>
+            </div>
+          </div>
+        </div>`
+    },
+    coupon: {
+      title: '我的優惠券',
+      html: `
+        <div class="space-y-3">
+          <div class="border-2 border-dashed border-orange-300 rounded-xl p-4 bg-orange-50 relative overflow-hidden">
+            <div class="absolute top-0 right-0 bg-orange-500 text-white text-xs px-2 py-1 rounded-bl-lg font-bold">可使用</div>
+            <div class="text-sm font-bold text-orange-700 mb-1">春季回饋折扣券</div>
+            <div class="text-2xl font-extrabold text-red-500 mb-2">折抵 NT$ 100</div>
+            <div class="flex items-center justify-between">
+              <span class="text-xs text-gray-400">有效期限：2026/04/30</span>
+              <span class="text-xs text-gray-500">滿 NT$300 可用</span>
+            </div>
+          </div>
+          <div class="border-2 border-dashed border-blue-200 rounded-xl p-4 bg-blue-50 relative overflow-hidden">
+            <div class="absolute top-0 right-0 bg-blue-500 text-white text-xs px-2 py-1 rounded-bl-lg font-bold">可使用</div>
+            <div class="text-sm font-bold text-blue-700 mb-1">鑽石購買優惠</div>
+            <div class="text-2xl font-extrabold text-blue-600 mb-2">9 折優惠</div>
+            <div class="flex items-center justify-between">
+              <span class="text-xs text-gray-400">有效期限：2026/05/15</span>
+              <span class="text-xs text-gray-500">鑽石商品適用</span>
+            </div>
+          </div>
+          <div class="border-2 border-dashed border-gray-200 rounded-xl p-4 bg-gray-50 relative overflow-hidden opacity-60">
+            <div class="absolute top-0 right-0 bg-gray-400 text-white text-xs px-2 py-1 rounded-bl-lg font-bold">已使用</div>
+            <div class="text-sm font-bold text-gray-600 mb-1">新手歡迎禮</div>
+            <div class="text-2xl font-extrabold text-gray-400 mb-2">折抵 NT$ 50</div>
+            <div class="flex items-center justify-between">
+              <span class="text-xs text-gray-400">有效期限：2026/04/10</span>
+              <span class="text-xs text-gray-400">已使用</span>
+            </div>
+          </div>
+        </div>`
+    },
+    cart: { title: '購物車', html: '<div id="cartPanelBody"></div>' }
+  };
+
+  function openPanel(type) {
+    currentPanel = type;
+    const data = PANEL_DATA[type];
+    document.getElementById('panelTitle').textContent = data.title;
+    document.getElementById('panelContent').innerHTML = data.html;
+    if (type === 'cart') renderCartPanel();
+    document.getElementById('panelOverlay').classList.remove('hidden');
+    document.getElementById('panelBox').classList.remove('hidden');
+  }
+  function closePanel() {
+    currentPanel = null;
+    document.getElementById('panelOverlay').classList.add('hidden');
+    document.getElementById('panelBox').classList.add('hidden');
+  }
+  function closePanelOrExit() {
+    closePanel();
+  }
+  function renderCartPanel() {
+    const el = document.getElementById('cartPanelBody');
+    if (!el) return;
+    if (cartItems.length === 0) {
+      el.innerHTML = '<div class="text-center text-gray-400 py-10"><div class="text-5xl mb-3">🛒</div><div class="text-sm">購物車是空的</div></div>';
+      return;
+    }
+    const total = cartItems.reduce((s, i) => s + i.price * i.qty, 0);
+    el.innerHTML = `
+      <div class="space-y-3 mb-4">
+        ${cartItems.map(i => `
+          <div class="flex items-center gap-3 bg-gray-50 rounded-xl p-3">
+            <span class="text-2xl">${i.emoji}</span>
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium text-gray-700 truncate">${i.name}</div>
+              <div class="text-xs text-red-500 font-bold">NT$ ${i.price}</div>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button onclick="changeQty(${i.id},-1)" class="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-sm font-bold hover:bg-gray-300">－</button>
+              <span class="text-sm font-bold w-5 text-center">${i.qty}</span>
+              <button onclick="changeQty(${i.id},1)" class="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-sm font-bold hover:bg-gray-300">＋</button>
+            </div>
+          </div>`).join('')}
+      </div>
+      <div class="border-t border-gray-100 pt-3">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-sm text-gray-600">合計</span>
+          <span class="text-lg font-extrabold text-red-500">NT$ ${total}</span>
+        </div>
+        <button class="w-full rounded-full text-white font-bold hover:opacity-90" style="background:#e74c3c;padding:18px 0;font-size:20px;letter-spacing:0.05em">前往結帳</button>
+      </div>`;
+  }
+  // ── Coupon Picker ──
+  let couponPickerSubtotal = 0;
+  function openCouponPicker(subtotal) {
+    couponPickerSubtotal = subtotal;
+    const el = document.getElementById('couponPickerBody');
+    el.innerHTML = COUPONS.map(c => {
+      const isSelected = c.id === selectedCoupon;
+      const unavail = c.type !== 'none' && c.minAmount > subtotal;
+      const discText = c.type === 'flat' ? `折抵 NT$ ${c.discount}` : c.type === 'percent' ? `省下 NT$ ${Math.round(subtotal * c.discount)}（${Math.round((1-c.discount)*100)}折）` : '不折扣';
+      const gradients = {
+        none: 'linear-gradient(135deg,#6b7280,#9ca3af)',
+        spring100: 'linear-gradient(135deg,#f59e0b,#ef4444)',
+        vip95: 'linear-gradient(135deg,#8b5cf6,#6d28d9)',
+        weekend100: 'linear-gradient(135deg,#10b981,#059669)',
+      };
+      const bg = gradients[c.id] || gradients.none;
+      return `
+        <div onclick="${unavail ? '' : `selectCoupon('${c.id}')`}"
+          style="margin-bottom:14px;border-radius:16px;overflow:hidden;
+                 border:3px solid ${isSelected ? '#fbbf24' : 'transparent'};
+                 opacity:${unavail ? '.42' : '1'};
+                 cursor:${unavail ? 'not-allowed' : 'pointer'};
+                 box-shadow:0 3px 14px rgba(0,0,0,.15);
+                 transform:${isSelected ? 'scale(1.02)' : 'scale(1)'};
+                 transition:transform .15s">
+          <!-- Coupon top band -->
+          <div style="background:${bg};padding:16px 20px;display:flex;align-items:center;justify-content:space-between;position:relative">
+            <div>
+              <div style="font-size:19px;font-weight:800;color:#fff;margin-bottom:2px">${c.label}</div>
+              <div style="font-size:15px;color:rgba(255,255,255,.82)">${unavail ? `需消費滿 NT$ ${c.minAmount} 才可使用` : discText}</div>
+            </div>
+            ${isSelected ? `<div style="background:#fff;color:${bg.includes('6b7280') ? '#6b7280' : '#1845c8'};font-size:14px;font-weight:800;padding:5px 14px;border-radius:20px;white-space:nowrap">✓ 使用中</div>` : ''}
+            <!-- Ticket notch left -->
+            <div style="position:absolute;left:-10px;top:50%;transform:translateY(-50%);width:20px;height:20px;border-radius:50%;background:#fff"></div>
+            <!-- Ticket notch right -->
+            <div style="position:absolute;right:-10px;top:50%;transform:translateY(-50%);width:20px;height:20px;border-radius:50%;background:#fff"></div>
+          </div>
+          <!-- Coupon bottom -->
+          <div style="background:#fff;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;border-top:1.5px dashed #e5e7eb">
+            <span style="font-size:14px;color:#9ca3af">${c.id === 'none' ? '不使用任何折扣' : c.minAmount > 0 ? `消費滿 NT$ ${c.minAmount} 可用` : '無最低消費限制'}</span>
+            ${!unavail && !isSelected ? `<span style="font-size:14px;color:#1845c8;font-weight:700">點擊套用 ›</span>` : ''}
+          </div>
+        </div>`;
+    }).join('');
+    document.getElementById('couponPickerModal').classList.remove('hidden');
+  }
+  function closeCouponPicker() {
+    document.getElementById('couponPickerModal').classList.add('hidden');
+  }
+  function selectCoupon(id) {
+    selectedCoupon = id;
+    closeCouponPicker();
+    renderCartModal();
+  }
+
+  function changeQty(id, delta) {
+    const item = cartItems.find(i => i.id === id);
+    if (!item) return;
+    item.qty += delta;
+    if (item.qty <= 0) cartItems.splice(cartItems.indexOf(item), 1);
+    updateCartBadge();
+    renderCartModal();
+  }
+
+  // ── Cart Checkout Modal ──
+  let selectedCoupon = 'none';
+  const COUPONS = [
+    { id: 'none',       label: '使用優惠券',              discount: 0,    type: 'none',    minAmount: 0   },
+    { id: 'spring100',  label: '春季回饋折扣券 (-NT$100)',   discount: 100,  type: 'flat',    minAmount: 300 },
+    { id: 'vip95',      label: '尊榮 VIP 95折',              discount: 0.05, type: 'percent', minAmount: 0   },
+    { id: 'weekend100', label: '週末大放送 (-NT$100)',        discount: 100,  type: 'flat',    minAmount: 0   },
+  ];
+
+  function openCartModal() {
+    selectedCoupon = 'none';
+    renderCartModal();
+    document.getElementById('cartModal').classList.remove('hidden');
+  }
+  function closeCartModal() {
+    document.getElementById('cartModal').classList.add('hidden');
+  }
+  function calcCartDiscount(subtotal) {
+    const c = COUPONS.find(c => c.id === selectedCoupon);
+    if (!c) return 0;
+    if (c.type === 'flat' && subtotal >= c.minAmount) return Math.min(c.discount, subtotal);
+    if (c.type === 'percent') return Math.round(subtotal * c.discount);
+    return 0;
+  }
+  function renderCartModal() {
+    const el = document.getElementById('cartModalBody');
+    if (!el) return;
+    if (cartItems.length === 0) {
+      el.innerHTML = '<div style="text-align:center;padding:48px 0;color:#9ca3af"><div style="font-size:56px;margin-bottom:12px">🛒</div><div style="font-size:18px">購物車是空的</div></div>';
+      return;
+    }
+    const subtotal = cartItems.reduce((s, i) => s + i.price * i.qty, 0);
+    const discount = calcCartDiscount(subtotal);
+    const total = subtotal - discount;
+    el.innerHTML = `
+      <!-- Cart items -->
+      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
+        ${cartItems.map(i => `
+          <div style="display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,#f0f4ff,#e8eeff);border:none;border-radius:14px;padding:12px 14px;box-shadow:0 3px 10px rgba(99,102,241,.1),inset 0 1px 0 rgba(255,255,255,.95)">
+            <div style="width:46px;height:46px;border-radius:12px;background:linear-gradient(145deg,#7c3aed,#4f46e5);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 3px 8px rgba(99,102,241,.3)">
+              <span style="font-size:26px;line-height:1">${i.emoji}</span>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:15px;font-weight:700;color:#1e293b;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${i.name}</div>
+              <div style="font-size:16px;font-weight:800;background:linear-gradient(135deg,#dc2626,#991b1b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">NT$ ${i.price}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;background:#fff;border:1.5px solid #e2e8f0;border-radius:30px;padding:4px 8px;box-shadow:0 2px 6px rgba(0,0,0,.06)">
+              <button onclick="changeQty(${i.id},-1)" style="width:32px;height:32px;border-radius:50%;background:linear-gradient(180deg,#f1f5f9,#e2e8f0);border:none;font-size:18px;cursor:pointer;font-weight:700;color:#64748b;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 0 #c8d0e0;transition:transform .1s" onmousedown="this.style.transform='translateY(2px)'" onmouseup="this.style.transform=''">－</button>
+              <span style="font-size:18px;font-weight:800;min-width:22px;text-align:center;color:#1e293b">${i.qty}</span>
+              <button onclick="changeQty(${i.id},1)" style="width:32px;height:32px;border-radius:50%;background:linear-gradient(180deg,#fb923c,#ea580c);border:none;font-size:18px;cursor:pointer;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 0 #9a3412;transition:transform .1s" onmousedown="this.style.transform='translateY(2px)'" onmouseup="this.style.transform=''">＋</button>
+            </div>
+          </div>`).join('')}
+      </div>
+
+      <!-- Coupon selector -->
+      <div style="margin-bottom:16px">
+        <div style="font-size:14px;font-weight:700;color:#6366f1;letter-spacing:.3px;margin-bottom:8px;display:flex;align-items:center;gap:5px">
+          <svg width="14" height="14" viewBox="0 0 56 38" fill="#6366f1"><rect x="2" y="7" width="52" height="24" rx="5" fill="#c7d2fe"/><circle cx="2" cy="19" r="5" fill="#818cf8"/><circle cx="54" cy="19" r="5" fill="#818cf8"/><line x1="17" y1="7" x2="17" y2="31" stroke="#6366f1" stroke-width="2" stroke-dasharray="3 2"/></svg>
+          使用優惠券
+        </div>
+        <button onclick="openCouponPicker(${subtotal})"
+          style="width:100%;padding:14px 16px;border:2px solid #fbbf24;border-radius:14px;background:linear-gradient(135deg,#fffbeb,#fef9c3);color:#92400e;font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:space-between;box-shadow:0 3px 10px rgba(251,191,36,.25),inset 0 1px 0 rgba(255,255,255,.8);transition:transform .1s" onmousedown="this.style.transform='scale(.99)'" onmouseup="this.style.transform=''">
+          <div style="display:flex;align-items:center;gap:10px;min-width:0">
+            <span style="font-size:22px;flex-shrink:0">🎫</span>
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${COUPONS.find(c=>c.id===selectedCoupon)?.label || '使用優惠券'}</span>
+          </div>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="#b45309" style="flex-shrink:0;margin-left:8px"><path d="M7 10l5 5 5-5H7z"/></svg>
+        </button>
+      </div>
+
+      <!-- Summary -->
+      <div style="background:linear-gradient(135deg,#f8faff,#f0f4ff);border:1.5px solid rgba(99,102,241,.12);border-radius:16px;padding:16px;margin-bottom:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.9)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <span style="font-size:15px;color:#64748b;font-weight:500">商品總計</span>
+          <span style="font-size:15px;color:#374151;font-weight:600">NT$ ${subtotal}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:12px;border-bottom:1.5px dashed rgba(99,102,241,.15)">
+          <span style="font-size:15px;color:#ef4444;font-weight:500">折扣金額</span>
+          <span style="font-size:15px;color:#ef4444;font-weight:600">－NT$ ${discount}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
+          <span style="font-size:18px;font-weight:800;color:#1e293b">應付金額</span>
+          <span style="font-size:28px;font-weight:900;background:linear-gradient(135deg,#dc2626,#991b1b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">NT$ ${total}</span>
+        </div>
+      </div>
+
+      <!-- Confirm button -->
+      <div style="padding-bottom:20px">
+        <button onclick="showToast('付款成功！感謝您的購買');closeCartModal();cartItems.length=0;updateCartBadge()" style="width:100%;padding:18px;border-radius:9999px;background:linear-gradient(180deg,#fb923c,#ea580c);color:#fff;border:none;font-size:20px;font-weight:700;cursor:pointer;letter-spacing:2px;box-shadow:0 3px 1px rgba(154,52,18,.5),0 6px 7px rgba(154,52,18,.25),0 10px 18px rgba(154,52,18,.12),0 16px 28px rgba(154,52,18,.07),inset 0 1.5px 0 rgba(255,255,255,.35);transition:transform .1s,box-shadow .1s;position:relative;top:0" onmousedown="this.style.transform='translateY(5px)';this.style.boxShadow='0 1px 1px rgba(154,52,18,.4),0 2px 6px rgba(154,52,18,.15),inset 0 1.5px 0 rgba(255,255,255,.25)'" onmouseup="this.style.transform='';this.style.boxShadow='0 3px 1px rgba(154,52,18,.5),0 6px 7px rgba(154,52,18,.25),0 10px 18px rgba(154,52,18,.12),0 16px 28px rgba(154,52,18,.07),inset 0 1.5px 0 rgba(255,255,255,.35)'" onmouseleave="this.style.transform='';this.style.boxShadow='0 3px 1px rgba(154,52,18,.5),0 6px 7px rgba(154,52,18,.25),0 10px 18px rgba(154,52,18,.12),0 16px 28px rgba(154,52,18,.07),inset 0 1.5px 0 rgba(255,255,255,.35)'">確認付款</button>
+      </div>`;
+  }
+</script>
+</body>
+</html>
