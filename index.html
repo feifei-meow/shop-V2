@@ -941,7 +941,7 @@
     <!-- TAB: 全部 -->
     <div id="tab-content-all">
     <div class="mt-8 pb-4">
-      <div class="grid grid-cols-3 gap-3">
+      <div class="grid grid-cols-4 gap-3">
         <div class="bg-white rounded-xl border border-gray-100 p-3 flex flex-col items-center relative hover:shadow-md cursor-pointer"
              onclick="openProduct({id:10,emoji:'💎',name:'60 鑽石',price:60,origPrice:60,desc:'購買後獲得 60 顆鑽石，可用於遊戲內各種購買。',tag:'',qty:99,limit:0})">
           <span class="absolute top-2 left-2 text-white rounded font-medium" style="font-size:9px;background:#6b7280;padding:1px 5px">不可用券</span>
@@ -1456,12 +1456,13 @@
   </div>
   <!-- Tab handle -->
   <button onclick="toggleLeftBar()" id="leftBarBtn"
-    class="select-none flex-shrink-0 flex flex-col items-center justify-center"
-    style="width:44px;height:130px;border-radius:0 16px 16px 0;background:linear-gradient(180deg,#4ade80,#16a34a,#15803d);color:#fff;font-weight:900;border:none;cursor:pointer;box-shadow:3px 0 1px rgba(20,83,45,.5),6px 0 5px rgba(20,83,45,.25),10px 0 16px rgba(20,83,45,.12),14px 0 24px rgba(22,163,74,.1),inset -2px 0 0 rgba(255,255,255,.35),inset 0 2px 0 rgba(255,255,255,.45);transition:transform .1s,box-shadow .1s"
+    class="select-none flex-shrink-0 flex flex-col items-center justify-center gap-1"
+    style="width:54px;height:180px;border-radius:0 20px 20px 0;background:linear-gradient(180deg,#4ade80,#16a34a,#15803d);color:#fff;font-weight:900;border:none;cursor:pointer;box-shadow:3px 0 1px rgba(20,83,45,.5),6px 0 5px rgba(20,83,45,.25),10px 0 16px rgba(20,83,45,.12),14px 0 24px rgba(22,163,74,.1),inset -2px 0 0 rgba(255,255,255,.35),inset 0 2px 0 rgba(255,255,255,.45);transition:transform .1s,box-shadow .1s"
     onmousedown="this.style.transform='translateX(3px)';this.style.boxShadow='1px 0 0 #14532d,inset -2px 0 0 rgba(255,255,255,.25)'"
     onmouseup="this.style.transform='';this.style.boxShadow='5px 0 0 #14532d,7px 0 0 rgba(20,83,45,.35),10px 0 24px rgba(22,163,74,.55),inset -2px 0 0 rgba(255,255,255,.35),inset 0 2px 0 rgba(255,255,255,.45)'"
     onmouseleave="this.style.transform='';this.style.boxShadow='5px 0 0 #14532d,7px 0 0 rgba(20,83,45,.35),10px 0 24px rgba(22,163,74,.55),inset -2px 0 0 rgba(255,255,255,.35),inset 0 2px 0 rgba(255,255,255,.45)'">
-    <span id="leftBarArrow" style="font-size:28px;line-height:1;color:#fff">›</span>
+    <span style="font-size:28px;font-weight:800;color:rgba(255,255,255,.95);writing-mode:vertical-rl;text-orientation:upright;letter-spacing:2px;line-height:1;text-shadow:0 1px 3px rgba(0,0,0,.3)">滿額贈禮</span>
+    <span id="leftBarArrow" style="font-size:32px;line-height:1;color:#fff;margin-top:4px">›</span>
   </button>
 </div>
 
